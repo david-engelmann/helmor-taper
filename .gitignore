@@ -1,0 +1,17 @@
+# Recorded tape artifacts are large + regenerated; keep them out of git.
+# A curated sample tape lives under docs/sample-tape/ (committed by hand).
+tapes/*
+!tapes/.gitkeep
+
+# Ephemeral SSH material the orchestrator may generate.
+fixtures/*
+!fixtures/.gitkeep
+
+# Rust / build
+target/
+**/*.rs.bk
+
+# Node / Bun
+node_modules/
+
+.DS_Store

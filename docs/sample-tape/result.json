@@ -1,0 +1,85 @@
+{
+  "scenario": "remote-runner",
+  "startedAt": "2026-05-27T16:21:19.632Z",
+  "host": "helmor-taper-arm64",
+  "runtimeName": "docker-linux-arm64",
+  "remoteBinary": "/home/e2e/.helmor/server/helmor-server",
+  "connectMs": 410,
+  "health": {
+    "hostname": "1a51913e7039",
+    "kind": {
+      "host": "helmor-taper-arm64",
+      "type": "remote"
+    },
+    "version": "0.26.0"
+  },
+  "runtimes": [
+    {
+      "isLocal": true,
+      "name": "local",
+      "state": {
+        "type": "connected"
+      }
+    },
+    {
+      "config": {
+        "host": "helmor-taper-arm64",
+        "remoteBinary": "/home/e2e/.helmor/server/helmor-server",
+        "type": "ssh"
+      },
+      "isLocal": false,
+      "name": "docker-linux-arm64",
+      "state": {
+        "type": "connected"
+      }
+    }
+  ],
+  "assertions": [
+    {
+      "name": "panel_opens",
+      "ok": true,
+      "detail": "dialogs=1"
+    },
+    {
+      "name": "starts_empty",
+      "ok": true,
+      "detail": "no remote servers yet"
+    },
+    {
+      "name": "ssh_connect_succeeds",
+      "ok": true,
+      "detail": "410ms"
+    },
+    {
+      "name": "daemon_reports_remote",
+      "ok": true,
+      "detail": "{\"host\":\"helmor-taper-arm64\",\"type\":\"remote\"}"
+    },
+    {
+      "name": "daemon_reports_version",
+      "ok": true,
+      "detail": "v0.26.0"
+    },
+    {
+      "name": "daemon_reports_hostname",
+      "ok": true,
+      "detail": "1a51913e7039"
+    },
+    {
+      "name": "ui_shows_connected_row",
+      "ok": true,
+      "detail": "docker-linux-arm64 | Connected | Auth | Diagnostics | Disconnect | "
+    },
+    {
+      "name": "row_says_connected",
+      "ok": true,
+      "detail": "docker-linux-arm64 | Connected | Auth | Diagnostics | Disconnect | "
+    },
+    {
+      "name": "backend_runtime_connected",
+      "ok": true,
+      "detail": "{\"type\":\"connected\"}"
+    }
+  ],
+  "passed": true
+}
