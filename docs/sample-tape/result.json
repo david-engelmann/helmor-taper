@@ -1,54 +1,22 @@
 {
-  "scenario": "remote-runner",
-  "startedAt": "2026-05-27T16:21:19.632Z",
-  "host": "helmor-taper-arm64",
-  "runtimeName": "docker-linux-arm64",
-  "remoteBinary": "/home/e2e/.helmor/server/helmor-server",
-  "connectMs": 410,
-  "health": {
-    "hostname": "1a51913e7039",
-    "kind": {
-      "host": "helmor-taper-arm64",
-      "type": "remote"
-    },
-    "version": "0.26.0"
-  },
-  "runtimes": [
-    {
-      "isLocal": true,
-      "name": "local",
-      "state": {
-        "type": "connected"
-      }
-    },
-    {
-      "config": {
-        "host": "helmor-taper-arm64",
-        "remoteBinary": "/home/e2e/.helmor/server/helmor-server",
-        "type": "ssh"
-      },
-      "isLocal": false,
-      "name": "docker-linux-arm64",
-      "state": {
-        "type": "connected"
-      }
-    }
-  ],
+  "scenario": "connect-over-ssh",
+  "startedAt": "2026-05-27T17:06:07.170Z",
+  "passed": true,
   "assertions": [
     {
       "name": "panel_opens",
       "ok": true,
-      "detail": "dialogs=1"
+      "detail": ""
     },
     {
       "name": "starts_empty",
       "ok": true,
-      "detail": "no remote servers yet"
+      "detail": ""
     },
     {
       "name": "ssh_connect_succeeds",
       "ok": true,
-      "detail": "410ms"
+      "detail": "4107ms"
     },
     {
       "name": "daemon_reports_remote",
@@ -61,25 +29,24 @@
       "detail": "v0.26.0"
     },
     {
-      "name": "daemon_reports_hostname",
-      "ok": true,
-      "detail": "1a51913e7039"
-    },
-    {
       "name": "ui_shows_connected_row",
       "ok": true,
-      "detail": "docker-linux-arm64 | Connected | Auth | Diagnostics | Disconnect | "
+      "detail": ""
     },
     {
       "name": "row_says_connected",
       "ok": true,
-      "detail": "docker-linux-arm64 | Connected | Auth | Diagnostics | Disconnect | "
-    },
-    {
-      "name": "backend_runtime_connected",
-      "ok": true,
-      "detail": "{\"type\":\"connected\"}"
+      "detail": "docker-linux-arm64 · Connected · Auth · Diagnostics · Disconnect · "
     }
   ],
-  "passed": true
+  "host": "helmor-taper-arm64",
+  "runtimeName": "docker-linux-arm64",
+  "health": {
+    "hostname": "1a51913e7039",
+    "kind": {
+      "host": "helmor-taper-arm64",
+      "type": "remote"
+    },
+    "version": "0.26.0"
+  }
 }
