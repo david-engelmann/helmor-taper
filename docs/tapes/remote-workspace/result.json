@@ -1,0 +1,28 @@
+{
+  "scenario": "remote-workspace",
+  "startedAt": "2026-05-27T17:36:11.260Z",
+  "passed": true,
+  "assertions": [
+    {
+      "name": "row_present",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "header_chip_visible",
+      "ok": true,
+      "detail": "Workspace runtime: docker-linux-arm64"
+    },
+    {
+      "name": "chip_names_runtime",
+      "ok": true,
+      "detail": "Workspace runtime: docker-linux-arm64"
+    }
+  ],
+  "runtimeName": "docker-linux-arm64",
+  "workspaceId": "6907a6b0-8acc-4f75-9664-6f399c78f0b6",
+  "chip": {
+    "label": "Workspace runtime: docker-linux-arm64",
+    "present": true
+  }
+}
