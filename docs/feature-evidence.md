@@ -95,25 +95,86 @@ All file-ops translate the local worktree path → the binding's `remote_path`
 
 ## Agent execution on the remote (the headline)
 
-| Feature | Status |
-|---|---|
-| `agent.send` routes to the daemon + spawns the sidecar **in the correct remote worktree** | ✅ confirmed (after the working-dir fix; daemon logs "agent bridge configured") |
-| Sidecar process spawned on the remote container with the right env (`HELMOR_SIDECAR_PATH`, `HELMOR_CLAUDE_CODE_BIN_PATH`) | ✅ confirmed (PID 23340 → defunct `helmor-sidecar` child observed via `docker exec ps`) |
-| LM Studio's Anthropic-compatible endpoint reachable from the container | ✅ confirmed (`/v1/messages` round-trip via `host.docker.internal:1235`) |
-| Agent CLI actually runs on the remote (Claude Code via LM Studio's Anthropic endpoint) | ⏳ blocked at sidecar module load: the Linux ELF sidecar runs, but `node-pty`'s `bindings()` call (triggered transitively by the Claude/Codex SDK imports) walks up from bun's virtual `/$bunfs/root/...` script path looking for a `package.json` or `node_modules` directory and finds none, throwing `Could not find module root`. Fix path: patch the sidecar to lazy-load pty (only when actually needed for interactive runs — never on a daemon-spawned headless remote), or ship a real `node_modules` next to the binary so `bindings()` short-circuits. Everything *around* the sidecar is staged + verified — claude binary runs on linux (`2.1.139`), the wrapper exports the right env, the daemon spawns the child, the model is reachable. |
+This is the table-stakes feature for any remote-dev claim that says
+"better than feature parity with VS Code Remote / Zed / Cursor."
+Helmor's sidecar process runs on the container, the bundled `claude`
+binary talks to whichever Anthropic-compatible endpoint you configure
+(LM Studio in this probe; production runs would hit Anthropic directly
+via a per-runtime API key stored on the daemon), and the streaming
+events flow back to the desktop over the same JSON-RPC pipe the rest
+of the remote-runner surface uses.
 
-See `../README.md` for the recorder/driver, and `docs/tapes/` for the captioned
+| Feature | Prove | Status |
+|---|---|---|
+| `agent.send` routes to the daemon + spawns the sidecar in the remote worktree | `scripts/probe-remote-agent.ts` — fires `send_agent_message_stream` against a remote-bound workspace, captures assistant message chunks via a Channel | ✅ confirmed (`REMOTE_AGENT_OK` streamed back letter-by-letter) |
+| **Sidecar process actually runs on the remote** | Inspect the container's process tree mid-stream: `helmor-server.real --daemon` + `helmor-sidecar` + `claude` are all children of the daemon, NOT of the SSH session | ✅ confirmed |
+| LM Studio's Anthropic-compatible endpoint reachable from the container | `/v1/messages` round-trip via `host.docker.internal:1235` | ✅ confirmed |
+| **Linux sidecar binary boots cleanly** (was: crashed at module load) | `bun run build` with `HELMOR_SIDECAR_TARGETS=linux-arm64` invokes Bun.build with the `redirectSqlite3` + `inlineCursorSdkChunk` plugins, replacing sqlite3's native `bindings('node_sqlite3.node')` lookup with the `bun:sqlite` shim before it can crash on `getRoot()` inside `/$bunfs/` | ✅ fixed in helmor `fix(remote): persistent daemon over SSH + Linux cross-builds of the sidecar` |
+| **Persistent daemon survives SSH disconnect** (was: per-session ServeStdio) | `scripts/probe-daemon-persistence.ts` — captures daemon PID, forces disconnect+reconnect, asserts same PID + same agent-session listing | ✅ fixed in helmor same commit (shell-quoting bug → `--ensure-daemon && exec --proxy` actually runs now) |
+
+## Remote runtime surface (industry-parity table)
+
+What every "open a remote workspace" implementation needs to deliver:
+
+| Feature | Industry analog | Prove | Status |
+|---|---|---|---|
+| Auto-install of remote server | VS Code Server install | Connect to a fresh host: `connect_remote_runtime` scp's helmor-server and execs it | ✅ confirmed (Track D) |
+| Persistent daemon across SSH drops | VS Code Server / Coder workspaces | `probe-daemon-persistence.ts` — daemon pid identical pre/post disconnect | ✅ confirmed |
+| Reconnect on transport drop | All three | `tapes/resilience` — `docker stop` → banner → `docker start` + reconnect → green | ✅ confirmed |
+| **Agent runs ON the remote** | Cursor remote pods, Zed remote agents | `probe-remote-agent.ts` — assistant message arrives from container | ✅ confirmed |
+| Remote integrated terminal | All three | `probe-remote-terminal.ts` — bash on the container, prompt + `whoami` + `pwd` show e2e + container hostname + remote path | ✅ confirmed |
+| File watcher on the remote | VS Code Remote-SSH | `probe-remote-watch.ts` — plant file via `docker exec`, `WorkspaceFilesChanged` event arrives within ms | ✅ confirmed (after the watch auto-route fix) |
+| Port forwarding | VS Code Remote-SSH `PORTS` panel | `probe-remote-port-forward.ts` — local→container TCP tunnel via `ssh -O forward` carries an HTTP body containing a unique marker | ✅ confirmed |
+| Workspace move across hosts | Zed | `clone_workspace_to_runtime{workspaceId,sourceWorkspaceDir,destinationRuntime,destinationPath}` | ✅ confirmed (Track F3) |
+| Per-host worktree path memory | Zed | `get_remembered_workspace_remote_path` | ✅ confirmed (Track F2.1) |
+| Per-runtime auth secrets stored on the daemon (key never leaves the host) | None — Helmor-original | `get_remote_runtime_auth_status` + `set_runtime_agent_auth` | ✅ confirmed (Track G2) |
+| SSH agent forwarding | VS Code Remote-SSH | `forwardAgent` flag in `connect_remote_runtime`; verified plumbed | ✅ wired (Track G3) |
+| ~/.ssh/config integration + host autocomplete + identity preview | All three | `list_ssh_hosts` / `list_ssh_host_details` / `list_ssh_identities` / `ssh_agent_status` / `probe_ssh_host` | ✅ confirmed (Track B1-B3, gif: add-remote-wizard) |
+| Status indicator (always-on remote chip) | All three | `tapes/remote-workspace` — blue chip in header + sidebar row | ✅ confirmed (Track B5) |
+| Per-method RPC metrics + copy-diagnostics bundle + daemon log tail | None at this depth | `tapes/observability` | ✅ confirmed (Track E1-E3) |
+
+## Headless probes (the runnable contract)
+
+Every claim in the parity table is backed by a probe under `scripts/`:
+
+| Probe | What it asserts |
+|---|---|
+| `feature-probe.ts` | 19 RPC-level checks (file ops, status, branch info, search, runtime health, diagnostics, metrics) all hit the container — proven via `REMOTE_ONLY_MARKER` |
+| `probe-remote-agent.ts` | Agent.send to a remote-bound workspace streams back chunks from a container-hosted claude binary calling LM Studio |
+| `probe-remote-terminal.ts` | PTY opened by `open_remote_terminal` is hosted on the daemon — output shows container's `whoami` / `hostname` / `pwd` |
+| `probe-remote-watch.ts` | Watch auto-routes via the workspace binding; `WorkspaceFilesChanged` fires for a file planted on the container |
+| `probe-remote-port-forward.ts` | Local-port `fetch()` round-trips through `ssh -O forward` to the container's listener |
+| `probe-daemon-persistence.ts` | Daemon PID + agent-session map survive a forced SSH disconnect + reconnect |
+
+See `../README.md` for the recorder/driver and `docs/tapes/` for the captioned
 gifs (`connect-over-ssh`, `remote-workspace`, `observability`, `resilience`,
-`add-remote-wizard`, `row-actions`, `remote-file-ops`). `scripts/feature-probe.ts`
-is the runnable confirmation behind this catalog; each `scenarios/*.ts` drives
-the live UI to record the matching gif.
+`add-remote-wizard`, `row-actions`, `remote-file-ops`).
 
 ## Bugs found + fixed while building this (in the helmor repo)
 
-The systematic confirmation surfaced real path-resolution bugs, since fixed:
-- `start_workspace_watch` used the local path on the remote → watch failed every
-  workspace-open. Now translates via `remote_path`.
-- `send_agent_message_stream` shipped the local cwd to `agent.send` → agent had
-  nowhere valid to run. Now translates via `resolve_remote_workspace_dir`.
-- (Plus 5 merge-regression fixes: `update_app_settings`/teardown `Arc` state,
-  test-setup typecheck, Docker `cmake`/`clang`.)
+The systematic confirmation surfaced real architectural bugs, all since fixed:
+
+- **Linux sidecar crash at module load** (`bindings`/sqlite3): the
+  `bun build --compile --target=bun-linux-arm64` CLI path bypassed
+  `build.ts`'s plugins, so the cross-compiled sidecar shipped with raw
+  sqlite3 native loader that crashed in bun's virtual `/$bunfs/` script
+  path. Fixed by routing all cross-arch builds through `Bun.build` with
+  the existing plugin pipeline.
+- **Persistent daemon never actually ran**: `OpenSshTransport` shipped
+  `sh -c '<bin>' --ensure-daemon && exec '<bin>' --proxy` as a single
+  ssh arg, which ssh space-joined onto the remote where the shell
+  word-split it back. The remote `sh -c` then ran the binary with no
+  args (defaulting to ServeStdio) and the `--proxy` half never reached
+  the `exec`. Fixed by wrapping the whole pipeline in an outer
+  `shell_quote`. `daemon.log` now appears, the socket is bound, the
+  daemon is double-forked off init, and reconnect just swaps the proxy.
+- **`start_workspace_watch` ignored the binding**: routed to the local
+  notify watcher unless an explicit `runtime_name` was passed, even on
+  workspaces bound to a remote. The file-op commands already auto-
+  routed via `resolve_runtime_for_call`; the watcher now mirrors that
+  contract via `resolve_watch_runtime`.
+- **`send_agent_message_stream` shipped the local cwd to the daemon**:
+  fixed earlier in `fix(remote): translate workspace_dir to remote_path
+  for watch + agent send`.
+- (Plus 5 merge-regression fixes: `update_app_settings`/teardown `Arc`
+  state, test-setup typecheck, Docker `cmake`/`clang`.)
