@@ -1,0 +1,55 @@
+{
+  "scenario": "observability",
+  "startedAt": "2026-05-28T01:39:21.791Z",
+  "passed": true,
+  "assertions": [
+    {
+      "name": "remote_connected",
+      "ok": true,
+      "detail": "docker-linux-arm64=connected"
+    },
+    {
+      "name": "panel_opens",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "diagnostics_card",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "ping_rtt_shown",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "metrics_table",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "metrics_have_rows",
+      "ok": true,
+      "detail": "6 methods"
+    },
+    {
+      "name": "copy_toast",
+      "ok": true,
+      "detail": "toast shown"
+    },
+    {
+      "name": "daemon_log_pre",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "daemon_log_has_lines",
+      "ok": true,
+      "detail": "1 lines"
+    }
+  ],
+  "runtimeName": "docker-linux-arm64",
+  "methodCount": 6,
+  "logLen": 1
+}

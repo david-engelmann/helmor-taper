@@ -1,0 +1,55 @@
+{
+  "scenario": "row-actions",
+  "startedAt": "2026-05-28T13:53:33.889Z",
+  "passed": true,
+  "assertions": [
+    {
+      "name": "panel_opens",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "row_present",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "auth_button",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "diagnostics_button",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "disconnect_button",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "diagnostics_toast",
+      "ok": true,
+      "detail": "toast shown"
+    },
+    {
+      "name": "auth_dialog_opens",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "auth_status_shown",
+      "ok": true,
+      "detail": "not-configured"
+    }
+  ],
+  "runtimeName": "docker-linux-arm64",
+  "actions": {
+    "auth": true,
+    "diagnostics": true,
+    "disconnect": true,
+    "reconnect": false
+  },
+  "authStatus": "not-configured"
+}

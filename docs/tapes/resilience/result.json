@@ -1,0 +1,34 @@
+{
+  "scenario": "resilience",
+  "startedAt": "2026-05-28T11:38:53.788Z",
+  "passed": true,
+  "assertions": [
+    {
+      "name": "panel_opens",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "row_present",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "state_flips_offline",
+      "ok": true,
+      "detail": "state=degraded"
+    },
+    {
+      "name": "banner_appears",
+      "ok": true,
+      "detail": "top-of-shell banner"
+    },
+    {
+      "name": "state_recovers",
+      "ok": true,
+      "detail": "state=connected"
+    }
+  ],
+  "runtimeName": "docker-linux-arm64",
+  "downState": "degraded"
+}

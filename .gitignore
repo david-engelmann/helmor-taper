@@ -3,6 +3,10 @@
 tapes/*
 !tapes/.gitkeep
 
+# Per-scene intermediate clips — finish-tape concatenates them into
+# master.{mp4,gif}, only the masters are evidence worth checking in.
+docs/tapes/*/scene-*.mp4
+
 # Ephemeral SSH material the orchestrator may generate.
 fixtures/*
 !fixtures/.gitkeep

@@ -1,0 +1,46 @@
+{
+  "scenario": "remote-file-ops",
+  "startedAt": "2026-05-28T14:04:12.712Z",
+  "passed": true,
+  "assertions": [
+    {
+      "name": "panel_opens",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "probe_section_scrolled",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "file_tree_clicked",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "file_tree_rendered",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "changes_clicked",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "changes_rendered",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "marker_in_changes",
+      "ok": true,
+      "detail": "marker visible in changes list"
+    }
+  ],
+  "workspaceId": "6907a6b0-8acc-4f75-9664-6f399c78f0b6",
+  "remotePath": "/home/e2e/helmor-workspaces/helmor-taper",
+  "marker": "REMOTE_ONLY_MARKER.txt",
+  "treePreview": "General · Appearance · Model · Shortcuts · Remote Servers · Runtime Debug"
+}

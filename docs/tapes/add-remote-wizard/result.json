@@ -1,0 +1,40 @@
+{
+  "scenario": "add-remote-wizard",
+  "startedAt": "2026-05-28T11:40:42.248Z",
+  "passed": true,
+  "assertions": [
+    {
+      "name": "panel_opens",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "wizard_opens",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "ssh_diagnostics_present",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "identities_listed",
+      "ok": true,
+      "detail": "1 rows"
+    },
+    {
+      "name": "host_detail_preview",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "forward_agent_toggled",
+      "ok": true,
+      "detail": ""
+    }
+  ],
+  "hostAlias": "helmor-taper-arm64",
+  "identityRows": 1,
+  "hostDetail": "From ~/.ssh/config: · HostName 127.0.0.1 · User e2e · IdentityFile /Users/david/personal/helmor/src-tauri/tests/docker-e2e/fixtures/id_e2e · "
+}

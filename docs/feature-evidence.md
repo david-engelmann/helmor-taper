@@ -98,11 +98,15 @@ All file-ops translate the local worktree path → the binding's `remote_path`
 | Feature | Status |
 |---|---|
 | `agent.send` routes to the daemon + spawns the sidecar **in the correct remote worktree** | ✅ confirmed (after the working-dir fix; daemon logs "agent bridge configured") |
-| Agent CLI actually runs on the remote (Claude Code via LM Studio's Anthropic endpoint) | ⏳ blocked: needs a **Linux-native** `helmor-sidecar` (cross-compiling on macOS embeds macOS native modules → `node-pty` crash). Build it on Linux to finish. |
+| Sidecar process spawned on the remote container with the right env (`HELMOR_SIDECAR_PATH`, `HELMOR_CLAUDE_CODE_BIN_PATH`) | ✅ confirmed (PID 23340 → defunct `helmor-sidecar` child observed via `docker exec ps`) |
+| LM Studio's Anthropic-compatible endpoint reachable from the container | ✅ confirmed (`/v1/messages` round-trip via `host.docker.internal:1235`) |
+| Agent CLI actually runs on the remote (Claude Code via LM Studio's Anthropic endpoint) | ⏳ blocked at sidecar module load: the Linux ELF sidecar runs, but `node-pty`'s `bindings()` call (triggered transitively by the Claude/Codex SDK imports) walks up from bun's virtual `/$bunfs/root/...` script path looking for a `package.json` or `node_modules` directory and finds none, throwing `Could not find module root`. Fix path: patch the sidecar to lazy-load pty (only when actually needed for interactive runs — never on a daemon-spawned headless remote), or ship a real `node_modules` next to the binary so `bindings()` short-circuits. Everything *around* the sidecar is staged + verified — claude binary runs on linux (`2.1.139`), the wrapper exports the right env, the daemon spawns the child, the model is reachable. |
 
 See `../README.md` for the recorder/driver, and `docs/tapes/` for the captioned
-gifs (connect-over-ssh, remote-workspace). `scripts/feature-probe.ts` is the
-runnable confirmation behind this catalog.
+gifs (`connect-over-ssh`, `remote-workspace`, `observability`, `resilience`,
+`add-remote-wizard`, `row-actions`, `remote-file-ops`). `scripts/feature-probe.ts`
+is the runnable confirmation behind this catalog; each `scenarios/*.ts` drives
+the live UI to record the matching gif.
 
 ## Bugs found + fixed while building this (in the helmor repo)
 
