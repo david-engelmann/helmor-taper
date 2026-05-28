@@ -42,13 +42,10 @@ const bindings = (await inv("list_workspace_runtime_bindings")) as Array<{
 }>;
 const bound = bindings.find((x) => x.runtimeName === NAME);
 if (!bound) throw new Error(`no workspace bound to ${NAME}`);
-const sessions = (await inv("list_workspace_sessions", { workspaceId: bound.workspaceId })) as Array<{
-	id: string;
-	active: boolean;
-}>;
-const session = sessions.find((s) => s.active) ?? sessions[0];
-if (!session) throw new Error("no session in bound workspace");
-console.error(`✓ ws=${bound.workspaceId.slice(0, 8)} session=${session.id.slice(0, 8)} remote=${bound.remotePath}`);
+// Create a fresh session each run so previous-stream guards don't block us.
+const fresh = (await inv("create_session", { workspaceId: bound.workspaceId })) as { sessionId: string };
+const session = { id: fresh.sessionId };
+console.error(`✓ ws=${bound.workspaceId.slice(0, 8)} session=${session.id.slice(0, 8)} (fresh) remote=${bound.remotePath}`);
 
 const localDir = process.env.LOCAL_WS_DIR ?? "/Users/david/helmor-dev/workspaces/helmor-taper/albiorix";
 
@@ -107,7 +104,13 @@ while (Date.now() < deadline) {
 			`var t=window.__taper||{}; return (t.evs||[]).slice(${lastShown});`,
 		)) as Array<{ kind?: string; data?: { type?: string; text?: string } }>;
 		for (const e of fresh) {
-			console.error(`  · ${e.kind} ${JSON.stringify(e.data).slice(0, 180)}`);
+			let body = "";
+			try {
+				body = JSON.stringify(e).slice(0, 200);
+			} catch {
+				body = String(e);
+			}
+			console.error(`  · ${body}`);
 		}
 		lastShown = s.n;
 	}
