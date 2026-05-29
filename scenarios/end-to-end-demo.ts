@@ -114,17 +114,26 @@ await tape.invoke("update_app_settings", {
 	},
 });
 
-// Reload to a clean shell.
+// Reload to a clean shell, then open the Remote Servers panel BEFORE
+// starting the recording so the first frame is the demo's opening
+// state (the connected runtime row), not the bare chat surface.
 await tape.js('window.location.reload(); return "r";');
 await tape.sleep(6000);
-
-// ── Beat 1 — connected baseline ────────────────────────────────────
 await tape.openSettings("remote-servers");
 tape.assert("panel_opens", await tape.waitFor("[role=dialog]", 10_000));
 tape.assert(
 	"row_present",
 	await tape.waitFor(`[data-testid=remote-server-row-${NAME}]`, 10_000),
 );
+
+// Start one continuous ScreenCaptureKit recording for the whole demo.
+// 70 s of beats + 10 s headroom = 80 s; rounded up to 90 against
+// docker / bridge variance. fps=8 + maxWidth=960 produces a sharp
+// gif via AVAssetImageGenerator that's small enough to embed in
+// markdown but legible end-to-end.
+await tape.startRecording(90, { gifFps: 8, gifMaxWidth: 960 });
+
+// ── Beat 1 — connected baseline ────────────────────────────────────
 await tape.scene({
 	caption: `Helmor — connected to ${NAME}, no agent runtime yet`,
 	hold: 5,

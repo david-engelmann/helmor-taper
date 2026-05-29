@@ -1,6 +1,6 @@
 {
   "scenario": "end-to-end-demo",
-  "startedAt": "2026-05-29T16:16:42.163Z",
+  "startedAt": "2026-05-29T16:43:40.507Z",
   "passed": true,
   "assertions": [
     {
@@ -34,8 +34,58 @@
       "detail": ""
     }
   ],
+  "beats": [
+    {
+      "t": 1.501,
+      "caption": "Helmor — connected to docker-linux-arm64, no agent runtime yet"
+    },
+    {
+      "t": 6.51,
+      "caption": "Reinstall → sha256-verified tar-stream over SSH, atomic per-file"
+    },
+    {
+      "t": 13.512,
+      "caption": "Everything lands in $HOME/.helmor/server/ — no sudo, no shell rc edits"
+    },
+    {
+      "t": 18.516,
+      "caption": "Agent runtime installed in 4.8s · ready to run agents on the container"
+    },
+    {
+      "t": 24.157,
+      "caption": "Workspace bound to docker-linux-arm64 — the blue chip says \"files live in the container\""
+    },
+    {
+      "t": 30.493,
+      "caption": "File tree → entries come from /home/e2e/helmor-workspaces/helmor-taper on the container"
+    },
+    {
+      "t": 36.501,
+      "caption": "Planted a file via docker exec → Run changes lists it. Proof: container, not laptop."
+    },
+    {
+      "t": 73.649,
+      "caption": "agent.send → daemon spawns the sidecar inside the container → live session row"
+    },
+    {
+      "t": 80.159,
+      "caption": "All ops route to the container. Your laptop is just the viewport."
+    },
+    {
+      "t": 88.909,
+      "caption": "docker stop → liveness ping fails → banner flips to Degraded"
+    },
+    {
+      "t": 99.478,
+      "caption": "docker start → Reconnect → green. Same daemon, same workspace, same sessions."
+    },
+    {
+      "t": 105.704,
+      "caption": "Everything Helmor wrote is in $HOME/.helmor/server/. Uninstall = rm -rf that one dir."
+    }
+  ],
   "runtimeName": "docker-linux-arm64",
   "workspaceId": "3d5594c9-a94a-4ef6-9305-6ae158ae72a0",
   "remotePath": "/home/e2e/helmor-workspaces/helmor-taper",
-  "chipText": "Agent runtime installed in 4.9s"
+  "chipText": "Agent runtime installed in 4.8s"
 }

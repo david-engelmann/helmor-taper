@@ -7,6 +7,15 @@ tapes/*
 # master.{mp4,gif}, only the masters are evidence worth checking in.
 docs/tapes/*/scene-*.mp4
 
+# The continuous-mode pipeline writes a raw master.mov before remuxing
+# to mp4 and converting to gif. The mp4 is what reviewers play inline;
+# the mov is a lossless intermediate that bloats the repo unnecessarily.
+docs/tapes/*/master.mov
+
+# Hidden placeholder file the continuous recorder touches to ensure
+# the tape dir exists before the recorder starts.
+docs/tapes/*/.placeholder
+
 # Ephemeral SSH material the orchestrator may generate.
 fixtures/*
 !fixtures/.gitkeep

@@ -4,16 +4,33 @@
 
 ![end-to-end demo](./tapes/end-to-end-demo/master.gif)
 
-One 100-second walkthrough that touches every promise: connect, the
-productionized auto-install with live progress chip, workspace
-bound-to-remote indicator, file ops on the container (with a
-remote-only marker proving the call really hit the daemon), agent
-session activity, `docker stop` → resilience banner → reconnect.
-Suitable as a PR's lead exhibit; the rest of the per-feature tapes
-below are zoomed-in versions of each beat.
+Single 90-second walkthrough — recorded as one continuous
+ScreenCaptureKit pass on the Helmor window, converted to mp4 (for
+inline browser playback) + gif (for markdown embeds). For a sharper
+viewing experience the mp4 is at
+[`tapes/end-to-end-demo/master.mp4`](./tapes/end-to-end-demo/master.mp4).
 
-Raw URL (for embedding):
-[`docs/tapes/end-to-end-demo/master.gif`](./tapes/end-to-end-demo/master.gif)
+### What's happening at each timestamp
+
+| At | What's on screen |
+|---|---|
+| 0:00 | Settings → Remote Servers. `docker-linux-arm64` is connected. |
+| 0:05 | Click **Reinstall** on the row → install chip flips into `installing`. |
+| 0:08 | Chip cycles through `Detecting remote architecture` → `Uploading agent runtime (3 files, 325.9 MB)` → `Verified checksums…` → `Bouncing daemon`. Sha256-verified tar-stream over SSH, atomic per-file commit. Every byte lands in `$HOME/.helmor/server/`. No sudo. |
+| 0:22 | Chip ends green: **Agent runtime installed in N.Ns**. Ready to run agents on the container. |
+| 0:25 | Close settings → select the workspace bound to `docker-linux-arm64`. The blue runtime chip in the header marks it as remote-hosted. |
+| 0:32 | Settings → Runtime Debug → Workspace inspector probe. Click **Run file tree** → the result lists files from `/home/e2e/helmor-workspaces/helmor-taper` on the container. |
+| 0:38 | Click **Run changes** → the file we planted on the container (`REMOTE_ONLY_MARKER.txt`) shows up as untracked. Proof: the call hit the container, not the laptop. |
+| 0:45 | Scroll to Remote agent sessions. `agent.send` fires from the bridge in the background → a session row appears with the request id + provider + workspace dir. The daemon spawned the sidecar inside the container. |
+| 0:55 | Close settings. Bind chip back on the workspace. |
+| 1:00 | `docker stop` the container. Liveness ping fails within 5 s; the top-of-shell banner flips to **Degraded — docker-linux-arm64**. |
+| 1:10 | `docker start` the container; click **Reconnect** in the banner. SSH re-establishes, banner clears, runtime back to **Connected**. Same daemon, same sessions. |
+| 1:20 | Settings → Remote Servers, end state. Everything Helmor wrote on the remote lives in `$HOME/.helmor/server/`. To uninstall: one `rm -rf` of that directory. |
+
+The end-to-end probe (`scripts/probe-bundle-install.ts`) is the
+headless equivalent — wipes the container, re-runs the install, asserts
+the agent streams `REMOTE_AGENT_OK` back. A green run + this demo is
+the contract the PR delivers.
 
 ---
 
