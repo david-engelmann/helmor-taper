@@ -1,0 +1,25 @@
+{
+  "scenario": "agent-on-remote",
+  "startedAt": "2026-05-29T15:57:51.800Z",
+  "passed": true,
+  "assertions": [
+    {
+      "name": "panel_opens",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "agent_session_row_visible",
+      "ok": true,
+      "detail": "b8ebf49c-2e59-4825-a2b8-a93ac22223c1"
+    },
+    {
+      "name": "row_shows_recent_activity",
+      "ok": true,
+      "detail": "b8ebf49c-2e59-4825-a2b8-a93ac22223c1 · no provider · no workspace dir · started 2m ago · last event 2m ago · Reattach · "
+    }
+  ],
+  "runtimeName": "docker-linux-arm64",
+  "requestId": "b8ebf49c-2e59-4825-a2b8-a93ac22223c1",
+  "rowSummary": "b8ebf49c-2e59-4825-a2b8-a93ac22223c1 · no provider · no workspace dir · started 2m ago · last event 2m ago · Reattach · Chat preview · Abort · "
+}

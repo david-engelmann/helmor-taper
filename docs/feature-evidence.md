@@ -132,6 +132,9 @@ What every "open a remote workspace" implementation needs to deliver:
 | ~/.ssh/config integration + host autocomplete + identity preview | All three | `list_ssh_hosts` / `list_ssh_host_details` / `list_ssh_identities` / `ssh_agent_status` / `probe_ssh_host` | ✅ confirmed (Track B1-B3, gif: add-remote-wizard) |
 | Status indicator (always-on remote chip) | All three | `tapes/remote-workspace` — blue chip in header + sidebar row | ✅ confirmed (Track B5) |
 | Per-method RPC metrics + copy-diagnostics bundle + daemon log tail | None at this depth | `tapes/observability` | ✅ confirmed (Track E1-E3) |
+| **First-connect auto-install of the agent runtime** — sidecar + claude bundle pushed via sha256-verified tar-pipe + AES-GCM, atomic per-file commit | VS Code Server install (smaller bundle; equivalent ceremony) | `tapes/first-connect-bundle` — wipe → connect → chip transitions `installing → installed in 5.9s` | ✅ confirmed |
+| **Live install progress chip** + Reinstall affordance + uninstall = one `rm -rf $HOME/.helmor/server` | None at this transparency | `tapes/first-connect-bundle` — operator sees every phase (`detecting → uploading → verifying → committing → bouncing-daemon`) labeled in the row | ✅ confirmed |
+| **Agent activity visible in the panel** — Remote agent sessions row + Reattach / Chat preview / Abort affordances | None | `tapes/agent-on-remote` — `agent.send` fires, row appears with provider/workspace/last-event metadata | ✅ confirmed |
 
 ## Headless probes (the runnable contract)
 
@@ -148,7 +151,9 @@ Every claim in the parity table is backed by a probe under `scripts/`:
 
 See `../README.md` for the recorder/driver and `docs/tapes/` for the captioned
 gifs (`connect-over-ssh`, `remote-workspace`, `observability`, `resilience`,
-`add-remote-wizard`, `row-actions`, `remote-file-ops`).
+`add-remote-wizard`, `row-actions`, `remote-file-ops`, `first-connect-bundle`,
+`agent-on-remote`). For the security model + install lifecycle, see
+[`helmor/docs/remote-runner.md`](https://github.com/david-engelmann/helmor/blob/main/docs/remote-runner.md).
 
 ## Bugs found + fixed while building this (in the helmor repo)
 

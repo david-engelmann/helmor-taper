@@ -1,0 +1,29 @@
+{
+  "scenario": "first-connect-bundle",
+  "startedAt": "2026-05-29T14:57:05.499Z",
+  "passed": true,
+  "assertions": [
+    {
+      "name": "panel_opens",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "row_present",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "bundle_chip_installing",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "bundle_chip_installed",
+      "ok": true,
+      "detail": ""
+    }
+  ],
+  "runtimeName": "docker-linux-arm64",
+  "chipText": "Agent runtime installed in 5.9s"
+}
