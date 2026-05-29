@@ -1,5 +1,22 @@
 # Remote-runner feature evidence catalog
 
+## ⭐ The full demo
+
+![end-to-end demo](./tapes/end-to-end-demo/master.gif)
+
+One 100-second walkthrough that touches every promise: connect, the
+productionized auto-install with live progress chip, workspace
+bound-to-remote indicator, file ops on the container (with a
+remote-only marker proving the call really hit the daemon), agent
+session activity, `docker stop` → resilience banner → reconnect.
+Suitable as a PR's lead exhibit; the rest of the per-feature tapes
+below are zoomed-in versions of each beat.
+
+Raw URL (for embedding):
+[`docs/tapes/end-to-end-demo/master.gif`](./tapes/end-to-end-demo/master.gif)
+
+---
+
 The reproducible map of **every intentional remote-runner feature** → how to
 **drive** it (the navigation to record) + how to **prove** it (the assertion
 that confirms it works). Two ways to use it:

@@ -1,0 +1,41 @@
+{
+  "scenario": "end-to-end-demo",
+  "startedAt": "2026-05-29T16:16:42.163Z",
+  "passed": true,
+  "assertions": [
+    {
+      "name": "panel_opens",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "row_present",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "installing_chip",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "installed_chip",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "debug_panel_opens",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "banner_visible",
+      "ok": true,
+      "detail": ""
+    }
+  ],
+  "runtimeName": "docker-linux-arm64",
+  "workspaceId": "3d5594c9-a94a-4ef6-9305-6ae158ae72a0",
+  "remotePath": "/home/e2e/helmor-workspaces/helmor-taper",
+  "chipText": "Agent runtime installed in 4.9s"
+}
