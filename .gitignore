@@ -29,3 +29,9 @@ node_modules/
 
 .DS_Store
 feature-probe-report.json
+
+# Cross-compiled `helmor-server` artifact produced by `.builder/`. The
+# Dockerfile + README stay checked in so the recipe is reproducible;
+# the binary itself is 8 MB of build output that gets refreshed any
+# time the upstream helmor crate changes.
+.builder/helmor-server
