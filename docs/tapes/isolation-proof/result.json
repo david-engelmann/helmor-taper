@@ -1,0 +1,72 @@
+{
+  "scenario": "isolation-proof",
+  "startedAt": "2026-06-02T14:58:41.697Z",
+  "passed": true,
+  "assertions": [
+    {
+      "name": "workspace_runtime_chip",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "composer_hook_attached",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "hostname_arrived",
+      "ok": true,
+      "detail": "Output ONLY the hostname of the machine you're running on. No other text, no preamble. Thought for 1s Run hostname "
+    },
+    {
+      "name": "hostname_is_container_not_laptop",
+      "ok": true,
+      "detail": "container_seen=true, laptop_seen=false (container=081e3cab7eb5, laptop=Davids-MacBook-Pro-2.local)"
+    },
+    {
+      "name": "users_path_arrived",
+      "ok": true,
+      "detail": "Does the path /Users/david exist on the filesystem you're operating on? Reply with only 'yes' or 'no'. Thought for 1s Ru"
+    },
+    {
+      "name": "users_path_reported_absent",
+      "ok": true,
+      "detail": "yes"
+    },
+    {
+      "name": "pwd_arrived",
+      "ok": true,
+      "detail": "What's the absolute path of your current working directory? Reply with only the path, nothing else. Thought for 1s Run p"
+    },
+    {
+      "name": "pwd_on_container_path",
+      "ok": true,
+      "detail": "yes"
+    }
+  ],
+  "beats": [
+    {
+      "t": 1.502,
+      "caption": "The agent below runs in a Docker container; the laptop is just the viewport."
+    },
+    {
+      "t": 66.276,
+      "caption": "\"hostname\" → 081e3cab7eb5 (container). Laptop's hostname doesn't appear anywhere."
+    },
+    {
+      "t": 137.894,
+      "caption": "\"/Users/david exist?\" → no. The container's filesystem has no /Users tree at all."
+    },
+    {
+      "t": 214.039,
+      "caption": "\"pwd\" → /home/e2e/... — the agent's CWD lives on the container, not the laptop."
+    }
+  ],
+  "runtimeName": "docker-linux-arm64",
+  "workspaceId": "305321b9-ed24-472d-80e3-247c61450d7d",
+  "remotePath": "/home/e2e/helmor-workspaces/helmor-taper",
+  "hostnames": {
+    "container": "081e3cab7eb5",
+    "laptop": "Davids-MacBook-Pro-2.local"
+  }
+}

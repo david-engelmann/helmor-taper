@@ -1,0 +1,77 @@
+{
+  "scenario": "chat-real-on-remote",
+  "startedAt": "2026-06-02T14:52:08.996Z",
+  "passed": true,
+  "assertions": [
+    {
+      "name": "workspace_runtime_chip",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "composer_hook_attached",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "ls_arrived",
+      "ok": true,
+      "detail": "List the files in this workspace, one per line, no preamble. Thinking Run ls -1 "
+    },
+    {
+      "name": "ls_tool_result_persisted_marker",
+      "ok": true,
+      "detail": "yes"
+    },
+    {
+      "name": "readme_arrived",
+      "ok": true,
+      "detail": "Read README.md from this workspace and quote its second line verbatim. Respond with only that line, no preamble. Thought"
+    },
+    {
+      "name": "readme_read_from_container",
+      "ok": true,
+      "detail": "yes"
+    },
+    {
+      "name": "create_arrived",
+      "ok": true,
+      "detail": "Create a file called HELMOR_DEMO.md in this workspace containing the single line: Hello from the remote container Though"
+    },
+    {
+      "name": "new_file_on_container",
+      "ok": true,
+      "detail": "Hello from the remote container"
+    }
+  ],
+  "beats": [
+    {
+      "t": 1.502,
+      "caption": "Workspace bound to docker-linux-arm64 — runtime chip in the header. The composer is the same one you'd use locally."
+    },
+    {
+      "t": 78.617,
+      "caption": "\"list the files\" → agent ran `ls -1` on the container; REMOTE_ONLY_MARKER.txt came back in the tool result."
+    },
+    {
+      "t": 147.065,
+      "caption": "\"read README.md\" → file read from /home/e2e/helmor-workspaces/helmor-taper, line quoted back."
+    },
+    {
+      "t": 218.633,
+      "caption": "\"create HELMOR_DEMO.md\" → file lives on the container's disk, not the laptop."
+    }
+  ],
+  "runtimeName": "docker-linux-arm64",
+  "workspaceId": "305321b9-ed24-472d-80e3-247c61450d7d",
+  "remotePath": "/home/e2e/helmor-workspaces/helmor-taper",
+  "prompts": {
+    "ls": "List the files in this workspace, one per line, no preamble.",
+    "readme": "Read README.md from this workspace and quote its second line verbatim. Respond with only that line, no preamble.",
+    "create": "Create a file called HELMOR_DEMO.md in this workspace containing the single line: Hello from the remote container"
+  },
+  "createdFile": {
+    "path": "/home/e2e/helmor-workspaces/helmor-taper/HELMOR_DEMO.md",
+    "body": "Hello from the remote container"
+  }
+}

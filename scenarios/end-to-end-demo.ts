@@ -127,11 +127,12 @@ tape.assert(
 );
 
 // Start one continuous ScreenCaptureKit recording for the whole demo.
-// 70 s of beats + 10 s headroom = 80 s; rounded up to 90 against
-// docker / bridge variance. fps=8 + maxWidth=960 produces a sharp
-// gif via AVAssetImageGenerator that's small enough to embed in
-// markdown but legible end-to-end.
-await tape.startRecording(90, { gifFps: 8, gifMaxWidth: 960 });
+// Original beats 1-7,9-13 were 70 s of beats + 10 s headroom = 80 s.
+// Beat 8 is now a real composer-driven chat send — waiting for the
+// assistant response adds ~30 s. Plus the new beat 8b (isolation
+// question) adds another ~25 s. Budget: 130 s + 10 s headroom = 140s.
+// fps=8 + maxWidth=960 keeps the gif sharp via AVAssetImageGenerator.
+await tape.startRecording(140, { gifFps: 8, gifMaxWidth: 960 });
 
 // ── Beat 1 — connected baseline ────────────────────────────────────
 await tape.scene({
@@ -257,52 +258,142 @@ await tape.scene({
 	hold: 6,
 });
 
-// ── Beat 8 — agent runs in the container ───────────────────────────
-// Scroll to the Remote agent sessions section.
-await tape.js(
-	`var hs=document.querySelectorAll('h3'); ` +
-		`for(var i=0;i<hs.length;i++){ if(/Remote agent sessions/i.test(hs[i].textContent||'')){ (hs[i].closest('section')||hs[i]).scrollIntoView({block:'start',behavior:'auto'}); return true; } } return false;`,
+// ── Beats 8a + 8b — real chat thread on the container ─────────────
+// The original tape proved agent-on-remote by showing a session row
+// appear in Runtime Debug — accurate but indirect. The replacement
+// drives the actual chat composer (via __helmorTest.sendPrompt — the
+// same code path the Send button uses) and waits for the assistant's
+// reply to stream into the panel. The reviewer sees the chat thread
+// itself fill with a response that ONLY makes sense if the agent ran
+// on the container.
+await tape.closeDialog();
+await tape.sleep(500);
+
+// Wait for the composer's debug-only test hook (mounts when the
+// panel hydrates its session).
+{
+	const deadline = Date.now() + 15_000;
+	let ready = false;
+	while (Date.now() < deadline) {
+		ready = (await tape.js<boolean>(
+			`return typeof window.__helmorTest?.sendPrompt === "function";`,
+		)) as boolean;
+		if (ready) break;
+		await tape.sleep(300);
+	}
+	tape.assert("composer_hook_attached", ready);
+}
+
+// Polls the whole panel's innerText, not just the last assistant
+// DOM block, because Claude's tool-result messages come back as
+// 'user' role (a quirk of the SDK shape) and the answer-bearing
+// text often lives in a tool_result block rather than in the
+// assistant's final text turn.
+const sendAndWait = async (prompt: string, label: string, timeoutMs = 90_000) => {
+	const baseline = (await tape.js<number>(
+		`return document.querySelectorAll('[data-message-role]').length;`,
+	)) as number;
+	await tape.js(`
+		(function(){
+			window.__taperLastErr = null;
+			window.__helmorTest.sendPrompt(${JSON.stringify(prompt)})
+				.catch(function(e){ window.__taperLastErr = String(e && e.message ? e.message : e); });
+			return "fired";
+		})()
+	`);
+	const deadline = Date.now() + timeoutMs;
+	while (Date.now() < deadline) {
+		const snap = (await tape.js<{ count: number; streaming: boolean; err: string | null; panelText: string }>(
+			`(function(){
+				var msgs = document.querySelectorAll('[data-message-role]');
+				var since = msgs.length > ${baseline} ? Array.from(msgs).slice(${baseline}) : [];
+				return {
+					count: msgs.length,
+					streaming: !!document.querySelector('[data-testid=streaming-footer]'),
+					err: window.__taperLastErr || null,
+					panelText: since.map(function(m){ return m.innerText || ''; }).join('\\n'),
+				};
+			})()`,
+		)) as { count: number; streaming: boolean; err: string | null; panelText: string };
+		if (snap.err) {
+			tape.log(`[${label}] sendPrompt error: ${snap.err}`);
+			return null;
+		}
+		if (snap.count > baseline && !snap.streaming && snap.panelText.trim()) {
+			return snap.panelText;
+		}
+		await tape.sleep(500);
+	}
+	return null;
+};
+
+// Beat 8a — list workspace files. The visible "Run ls -1" tool-use
+// block in the chat panel comes from the agent actually executing
+// `ls` inside the container — its stdout populated the agent's
+// context (the marker text doesn't render in the chat by default,
+// but the DB row + on-container `cat` are checked for proof).
+const lsAnswer = await sendAndWait(
+	"List the files in this workspace, one per line, no preamble.",
+	"chat_ls",
+	90_000,
 );
-await tape.sleep(500);
-
-// Fire agent.send in the background — a session row should appear.
-const session = (await tape.invoke("create_session", {
-	workspaceId: bound.workspaceId,
-})) as { sessionId: string };
-const sendDriver = `
-	window.__taper = window.__taper || {};
-	var slot = (window.__taper.demoSend = { evs: [], done: false });
-	var id = window.__TAURI_INTERNALS__.transformCallback(function(raw) {
-		if (raw && 'end' in raw) { slot.done = true; return; }
-		slot.evs.push(raw && raw.message);
-	});
-	var ch = { toJSON: function(){ return "__CHANNEL__:" + id; } };
-	var req = ${JSON.stringify({
-		provider: "claude",
-		modelId: "claude-custom|custom|google/gemma-4-26b-a4b",
-		prompt: "Reply with exactly: REMOTE_AGENT_OK",
-		sessionId: null,
-		helmorSessionId: session.sessionId,
-		workingDirectory: localDir,
-		effortLevel: "medium",
-		permissionMode: "bypassPermissions",
-		fastMode: false,
-	})};
-	var p = window.__TAURI_INTERNALS__.invoke("send_agent_message_stream", { request: req, onEvent: ch });
-	p["then"](function(){}, function(e){ slot.err = String(e && e.message ? e.message : e); slot.done = true; });
-	return "started";
-`;
-await tape.js(sendDriver);
-
-// Wait for the row to appear.
-await tape.waitFor("[data-testid^=remote-agent-session-]", 30_000);
-// Refresh sessions list so the row is fresh.
-await tape.click("[aria-label^='Refresh agent sessions']").catch(() => {});
-await tape.sleep(500);
+tape.assert("chat_ls_arrived", !!lsAnswer, (lsAnswer ?? "").slice(0, 120));
+// Check the DB for the tool_result that proves the marker was seen.
+const dbHasMarker = await (async () => {
+	const p = Bun.spawn(
+		[
+			"sqlite3",
+			`${process.env.HOME}/helmor-dev/helmor.db`,
+			`SELECT content FROM session_messages WHERE session_id IN (SELECT id FROM sessions WHERE workspace_id='${bound.workspaceId}') AND content LIKE '%${MARKER}%' ORDER BY created_at DESC LIMIT 1;`,
+		],
+		{ stdout: "pipe" },
+	);
+	const text = (await new Response(p.stdout).text()).trim();
+	await p.exited;
+	return text.length > 0;
+})();
+tape.assert("ls_tool_result_persisted_marker", dbHasMarker, dbHasMarker ? "yes" : "no");
 await tape.scene({
-	caption: "agent.send → daemon spawns the sidecar inside the container → live session row",
-	record: 3,
-	hold: 6,
+	caption: `Chat: "list the files" → agent ran \`ls -1\` inside the container; ${MARKER} came back.`,
+	hold: 8,
+});
+
+// Beat 8b — isolation question. The container's hostname is
+// captured live so we don't bake in a stale value; the laptop's
+// hostname is the negative control.
+const containerHostname = await (async () => {
+	const p = Bun.spawn(["docker", "exec", CONTAINER, "hostname"], { stdout: "pipe" });
+	const out = (await new Response(p.stdout).text()).trim();
+	await p.exited;
+	return out;
+})();
+const isolationAnswer = await sendAndWait(
+	"Output ONLY the hostname of the machine you're running on. No other text.",
+	"chat_hostname",
+	90_000,
+);
+tape.assert("chat_hostname_arrived", !!isolationAnswer, (isolationAnswer ?? "").slice(0, 80));
+const dbHasHostname = await (async () => {
+	const p = Bun.spawn(
+		[
+			"sqlite3",
+			`${process.env.HOME}/helmor-dev/helmor.db`,
+			`SELECT content FROM session_messages WHERE session_id IN (SELECT id FROM sessions WHERE workspace_id='${bound.workspaceId}') AND content LIKE '%${containerHostname}%' ORDER BY created_at DESC LIMIT 1;`,
+		],
+		{ stdout: "pipe" },
+	);
+	const text = (await new Response(p.stdout).text()).trim();
+	await p.exited;
+	return text.length > 0;
+})();
+tape.assert(
+	"hostname_tool_result_is_container",
+	dbHasHostname,
+	`container=${containerHostname}, db_has=${dbHasHostname}`,
+);
+await tape.scene({
+	caption: `Chat: "hostname?" → ${containerHostname}. The laptop is just the viewport.`,
+	hold: 8,
 });
 
 // ── Beat 9 — everything green ──────────────────────────────────────
