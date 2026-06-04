@@ -114,6 +114,21 @@ await tape.invoke("update_app_settings", {
 	},
 });
 
+// Wipe the workspace's session history + pin the LM Studio model so
+// beat 8's composer-driven send routes through the local bridge and
+// not Anthropic's hosted Claude (which would surface "/login" because
+// the desktop has no Anthropic API key in this dev session).
+{
+	const wipe = Bun.spawn([
+		"sqlite3",
+		`${process.env.HOME}/helmor-dev/helmor.db`,
+		`DELETE FROM session_messages WHERE session_id IN (SELECT id FROM sessions WHERE workspace_id='${bound.workspaceId}'); ` +
+			`UPDATE sessions SET model='claude-custom|custom|google/gemma-4-26b-a4b' WHERE workspace_id='${bound.workspaceId}';`,
+	]);
+	if ((await wipe.exited) !== 0) throw new Error("failed to wipe session history");
+	tape.log(`wiped session_messages + pinned LM Studio model for workspace ${bound.workspaceId.slice(0, 8)}`);
+}
+
 // Reload to a clean shell, then open the Remote Servers panel BEFORE
 // starting the recording so the first frame is the demo's opening
 // state (the connected runtime row), not the bare chat surface.
@@ -368,7 +383,7 @@ const containerHostname = await (async () => {
 	return out;
 })();
 const isolationAnswer = await sendAndWait(
-	"Output ONLY the hostname of the machine you're running on. No other text.",
+	"Run the shell command `hostname` and reply with only its raw output.",
 	"chat_hostname",
 	90_000,
 );

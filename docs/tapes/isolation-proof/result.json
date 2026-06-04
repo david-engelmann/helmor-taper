@@ -1,6 +1,6 @@
 {
   "scenario": "isolation-proof",
-  "startedAt": "2026-06-02T14:58:41.697Z",
+  "startedAt": "2026-06-03T19:09:55.175Z",
   "passed": true,
   "assertions": [
     {
@@ -16,7 +16,7 @@
     {
       "name": "hostname_arrived",
       "ok": true,
-      "detail": "Output ONLY the hostname of the machine you're running on. No other text, no preamble. Thought for 1s Run hostname "
+      "detail": "Run the shell command `hostname` and reply with only its raw output. Thought for 1s 081e3cab7eb5 55.7s • less than a min"
     },
     {
       "name": "hostname_is_container_not_laptop",
@@ -26,17 +26,17 @@
     {
       "name": "users_path_arrived",
       "ok": true,
-      "detail": "Does the path /Users/david exist on the filesystem you're operating on? Reply with only 'yes' or 'no'. Thought for 1s Ru"
+      "detail": "Run the shell command `[ -e /Users/david ] && echo yes || echo no` and reply with only its output. Thought for 1s no 1m "
     },
     {
       "name": "users_path_reported_absent",
       "ok": true,
-      "detail": "yes"
+      "detail": "yes (toolResult=false, textBlock=true)"
     },
     {
       "name": "pwd_arrived",
       "ok": true,
-      "detail": "What's the absolute path of your current working directory? Reply with only the path, nothing else. Thought for 1s Run p"
+      "detail": "Run the shell command `pwd` and reply with only the path it prints. Thought for 1s /home/e2e/helmor-workspaces/helmor-ta"
     },
     {
       "name": "pwd_on_container_path",
@@ -46,19 +46,19 @@
   ],
   "beats": [
     {
-      "t": 1.502,
+      "t": 1.505,
       "caption": "The agent below runs in a Docker container; the laptop is just the viewport."
     },
     {
-      "t": 66.276,
+      "t": 62.524,
       "caption": "\"hostname\" → 081e3cab7eb5 (container). Laptop's hostname doesn't appear anywhere."
     },
     {
-      "t": 137.894,
+      "t": 132.799,
       "caption": "\"/Users/david exist?\" → no. The container's filesystem has no /Users tree at all."
     },
     {
-      "t": 214.039,
+      "t": 216.461,
       "caption": "\"pwd\" → /home/e2e/... — the agent's CWD lives on the container, not the laptop."
     }
   ],

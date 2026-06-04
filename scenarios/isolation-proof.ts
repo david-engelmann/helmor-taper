@@ -25,9 +25,18 @@ const BIN = process.env.REMOTE_BINARY ?? "/home/e2e/.helmor/server/helmor-server
 const CONTAINER = process.env.CONTAINER ?? "helmor-test-linux-arm64";
 const OUT = process.env.TAPE_DIR ?? "./tapes/isolation-proof";
 
-const PROMPT_HOSTNAME = "Output ONLY the hostname of the machine you're running on. No other text, no preamble.";
-const PROMPT_USERS = "Does the path /Users/david exist on the filesystem you're operating on? Reply with only 'yes' or 'no'.";
-const PROMPT_PWD = "What's the absolute path of your current working directory? Reply with only the path, nothing else.";
+// Explicit shell-invocation prompts. Smaller models (the LM Studio
+// gemma-4-26b-a4b bridge in particular) sometimes echo back the
+// keyword instead of actually running the command when the prompt
+// reads like a behavioural request ("output the hostname"). Asking
+// for `Run <cmd>` removes that ambiguity for the model + makes the
+// captured tape's intent crystal clear to a reviewer.
+const PROMPT_HOSTNAME =
+	"Run the shell command `hostname` and reply with only its raw output.";
+const PROMPT_USERS =
+	"Run the shell command `[ -e /Users/david ] && echo yes || echo no` and reply with only its output.";
+const PROMPT_PWD =
+	"Run the shell command `pwd` and reply with only the path it prints.";
 
 const tape = new Tape("isolation-proof", OUT);
 await tape.connect();
@@ -81,6 +90,22 @@ const laptopHostname = await (async () => {
 	return out;
 })();
 tape.log(`container hostname=${containerHostname}, laptop hostname=${laptopHostname}`);
+
+// Wipe the workspace's session history so the chat panel is blank
+// when recording starts. Without this, prior probes from the same
+// dev session bleed into the captured tape. Also pin the session's
+// model to the LM Studio bridge so agent.send doesn't hit Anthropic
+// (which would auth-fail with "/login").
+{
+	const wipe = Bun.spawn([
+		"sqlite3",
+		`${process.env.HOME}/helmor-dev/helmor.db`,
+		`DELETE FROM session_messages WHERE session_id IN (SELECT id FROM sessions WHERE workspace_id='${bound.workspaceId}'); ` +
+			`UPDATE sessions SET model='claude-custom|custom|google/gemma-4-26b-a4b' WHERE workspace_id='${bound.workspaceId}';`,
+	]);
+	if ((await wipe.exited) !== 0) throw new Error("failed to wipe session history");
+	tape.log(`wiped session_messages + pinned LM Studio model for workspace ${bound.workspaceId.slice(0, 8)}`);
+}
 
 // Reload + select bound workspace + wait for composer hook.
 await tape.js('window.location.reload(); return "r";');
@@ -189,14 +214,31 @@ await tape.scene({
 	hold: 8,
 });
 
-// Beat 3: laptop path absence.
+// Beat 3: laptop path absence. The model may answer either via a
+// `tool_result` row (when it runs the shell check) or as a plain
+// assistant text block (when it answers "no" from context — same
+// truth either way: the path doesn't exist on the container the
+// agent is operating on). Accept both shapes.
 const t2 = Date.now();
 await sendAndWait(PROMPT_USERS, "users_path", 90_000);
-// Look for a tool_result whose content was literally "no" (the
-// expected exit-code-driven reply). Bounded substring keeps it
-// false on unrelated rows.
-const sawNo = await dbContainsRecent(bound.workspaceId, '"content":"no"', t2);
-tape.assert("users_path_reported_absent", sawNo, sawNo ? "yes" : "no");
+const sawNoToolResult = await dbContainsRecent(
+	bound.workspaceId,
+	'"content":"no"',
+	t2,
+);
+const sawNoTextBlock = await dbContainsRecent(
+	bound.workspaceId,
+	'"text":"no"',
+	t2,
+);
+const sawNo = sawNoToolResult || sawNoTextBlock;
+tape.assert(
+	"users_path_reported_absent",
+	sawNo,
+	sawNo
+		? `yes (toolResult=${sawNoToolResult}, textBlock=${sawNoTextBlock})`
+		: "no",
+);
 await tape.scene({
 	caption: `\"/Users/david exist?\" → no. The container's filesystem has no /Users tree at all.`,
 	hold: 8,

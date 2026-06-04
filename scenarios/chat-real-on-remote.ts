@@ -88,6 +88,23 @@ if (!bound) throw new Error(`no workspace bound to ${NAME}; run setup-remote-wor
 	tape.log(`planted ${MARKER}; cleared any stale ${NEW_FILE}`);
 }
 
+// Wipe the workspace's session history so the recording starts on a
+// blank chat panel. Previous test runs in the same dev session leave
+// dozens of prior prompts visible during scroll — the recorded tape
+// should be a clean narrative. Also pin the session's model to the
+// LM Studio bridge so the agent.send doesn't hit Anthropic's
+// hosted Claude (which would prompt "/login").
+{
+	const wipe = Bun.spawn([
+		"sqlite3",
+		`${process.env.HOME}/helmor-dev/helmor.db`,
+		`DELETE FROM session_messages WHERE session_id IN (SELECT id FROM sessions WHERE workspace_id='${bound.workspaceId}'); ` +
+			`UPDATE sessions SET model='claude-custom|custom|google/gemma-4-26b-a4b' WHERE workspace_id='${bound.workspaceId}';`,
+	]);
+	if ((await wipe.exited) !== 0) throw new Error("failed to wipe session history");
+	tape.log(`wiped session_messages + pinned LM Studio model for workspace ${bound.workspaceId.slice(0, 8)}`);
+}
+
 // Reload to a clean state and select the bound workspace.
 await tape.js('window.location.reload(); return "r";');
 await tape.sleep(6000);

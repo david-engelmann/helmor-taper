@@ -1,7 +1,7 @@
 {
   "scenario": "end-to-end-demo",
-  "startedAt": "2026-06-02T14:42:23.675Z",
-  "passed": true,
+  "startedAt": "2026-06-04T00:51:11.816Z",
+  "passed": false,
   "assertions": [
     {
       "name": "panel_opens",
@@ -36,7 +36,7 @@
     {
       "name": "chat_ls_arrived",
       "ok": true,
-      "detail": "List the files in this workspace, one per line, no preamble.\n\n\nThought for 2s\nRun\nls -1\n"
+      "detail": "List the files in this workspace, one per line, no preamble.\n\n\nThought for 1s\nLICENSE\nREADME.md\nREMOTE_ONLY_MARKER.txt\nW"
     },
     {
       "name": "ls_tool_result_persisted_marker",
@@ -45,13 +45,13 @@
     },
     {
       "name": "chat_hostname_arrived",
-      "ok": true,
-      "detail": "Output ONLY the hostname of the machine you're running on. No other text.\n\n\nThou"
+      "ok": false,
+      "detail": ""
     },
     {
       "name": "hostname_tool_result_is_container",
-      "ok": true,
-      "detail": "container=081e3cab7eb5, db_has=true"
+      "ok": false,
+      "detail": "container=081e3cab7eb5, db_has=false"
     },
     {
       "name": "banner_visible",
@@ -61,60 +61,60 @@
   ],
   "beats": [
     {
-      "t": 1.505,
+      "t": 1.501,
       "caption": "Helmor — connected to docker-linux-arm64, no agent runtime yet"
     },
     {
-      "t": 6.536,
+      "t": 6.518,
       "caption": "Reinstall → sha256-verified tar-stream over SSH, atomic per-file"
     },
     {
-      "t": 13.538,
+      "t": 13.52,
       "caption": "Everything lands in $HOME/.helmor/server/ — no sudo, no shell rc edits"
     },
     {
-      "t": 23.485,
-      "caption": "Agent runtime installed in 16.0s · ready to run agents on the container"
+      "t": 18.528,
+      "caption": "Agent runtime installed in 7.6s · ready to run agents on the container"
     },
     {
-      "t": 29.405,
+      "t": 24.142,
       "caption": "Workspace bound to docker-linux-arm64 — the blue chip says \"files live in the container\""
     },
     {
-      "t": 36.336,
+      "t": 30.436,
       "caption": "File tree → entries come from /home/e2e/helmor-workspaces/helmor-taper on the container"
     },
     {
-      "t": 42.355,
+      "t": 36.444,
       "caption": "Planted a file via docker exec → Run changes lists it. Proof: container, not laptop."
     },
     {
-      "t": 104.679,
+      "t": 98.394,
       "caption": "Chat: \"list the files\" → agent ran `ls -1` inside the container; REMOTE_ONLY_MARKER.txt came back."
     },
     {
-      "t": 168.526,
+      "t": 196.843,
       "caption": "Chat: \"hostname?\" → 081e3cab7eb5. The laptop is just the viewport."
     },
     {
-      "t": 177.035,
+      "t": 205.348,
       "caption": "All ops route to the container. Your laptop is just the viewport."
     },
     {
-      "t": 183.806,
+      "t": 211.26,
       "caption": "docker stop → liveness ping fails → banner flips to Degraded"
     },
     {
-      "t": 197.143,
+      "t": 223.05,
       "caption": "docker start → Reconnect → green. Same daemon, same workspace, same sessions."
     },
     {
-      "t": 203.792,
+      "t": 229.295,
       "caption": "Everything Helmor wrote is in $HOME/.helmor/server/. Uninstall = rm -rf that one dir."
     }
   ],
   "runtimeName": "docker-linux-arm64",
   "workspaceId": "305321b9-ed24-472d-80e3-247c61450d7d",
   "remotePath": "/home/e2e/helmor-workspaces/helmor-taper",
-  "chipText": "Agent runtime installed in 16.0s"
+  "chipText": "Agent runtime installed in 7.6s"
 }
