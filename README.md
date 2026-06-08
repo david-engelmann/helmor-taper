@@ -8,6 +8,26 @@ app window with ScreenCaptureKit (window-buffer capture — overlapping apps nev
 leak into the frame), runs programmatic assertions against the captured IPC +
 backend state, and emits a PR-ready bundle (`.mov` / `.mp4` / `.gif` + logs).
 
+## Migration in progress: TypeScript → Rust
+
+The current implementation is TypeScript (`scenarios/*.ts`, `scripts/*.ts`) +
+Swift for ScreenCaptureKit (`scripts/record-window.swift`,
+`scripts/{mov-to-mp4,mp4-to-gif}.swift`) + Bash for orchestration. A Rust
+rewrite landed alongside it in Phase R1 (the MCP bridge client crate). The
+TypeScript scaffolding stays in place until the Rust port reaches feature
+parity; then it gets removed in one sweep.
+
+Today (Phase R1):
+- `cargo build --all-targets` → clean.
+- `cargo test` → 15 / 15 passing (bridge protocol round-trips, port-scanning
+  connect, mock-server request/response correlation, timeout, error-frame
+  surfacing, concurrent-request fan-out).
+- `cargo run --bin taper -- ping` → smoke-tests against a live Helmor's
+  MCP bridge if `bun run dev` is up.
+
+See `src/bridge/{mod,protocol,client}.rs` for the Rust port; `scripts/mcp-bridge.ts`
+remains as the TypeScript implementation that the scenarios still call.
+
 The flagship scenario is the **remote-runner**: a Dockerized Linux host running
 `helmor-server` over SSH, with the desktop connecting to it, going green, and
 running an agent on the remote — the whole point of the remote-runner feature,

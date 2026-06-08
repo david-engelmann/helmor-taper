@@ -1,0 +1,32 @@
+[package]
+name = "helmor-taper"
+version = "0.1.0"
+edition = "2021"
+description = "Recorded-evidence harness for Helmor — drives the live UI through the MCP bridge while ScreenCaptureKit records the window."
+license = "MIT"
+repository = "https://github.com/david-engelmann/helmor-taper"
+publish = false
+
+[lib]
+name = "helmor_taper"
+path = "src/lib.rs"
+
+[[bin]]
+name = "taper"
+path = "src/bin/taper.rs"
+
+[dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "io-util", "sync", "time", "net", "process"] }
+tokio-tungstenite = { version = "0.24", default-features = false, features = ["connect"] }
+futures-util = "0.3"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+thiserror = "1"
+uuid = { version = "1", features = ["v4"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+url = "2"
+
+[dev-dependencies]
+tokio-tungstenite = { version = "0.24", default-features = false, features = ["connect", "handshake"] }
