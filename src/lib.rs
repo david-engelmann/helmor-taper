@@ -25,6 +25,7 @@
 
 pub mod bridge;
 pub mod commands;
+pub mod probes;
 pub mod scenarios;
 pub mod tape;
 

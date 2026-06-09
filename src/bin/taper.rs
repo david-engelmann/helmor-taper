@@ -20,6 +20,10 @@ use std::env;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
+use helmor_taper::probes::{
+    bundle_install, daemon_persistence, feature_probe, remote_agent, remote_port_forward,
+    remote_terminal, remote_watch,
+};
 use helmor_taper::scenarios::{
     add_remote_wizard, agent_on_remote, chat_real_on_remote, connect_over_ssh, end_to_end_demo,
     first_connect_bundle, isolation_proof, observability, remote_file_ops, remote_runner,
@@ -85,14 +89,58 @@ fn print_usage(prog: &str) {
     eprintln!("  agent-on-remote     send_agent_message_stream → session row populates");
     eprintln!("  chat-real-on-remote Composer-driven chat: ls + README + file creation");
     eprintln!("  end-to-end-demo     THE demo — full user journey, 75-90s gif");
+    eprintln!();
+    eprintln!("Probes (headless feature checks; `taper probe <name>`):");
+    eprintln!("  bundle-install      Install pipeline → manifest → reconnect → agent.send");
+    eprintln!("  daemon-persistence  Daemon PID survives disconnect/reconnect");
+    eprintln!("  remote-agent        send_agent_message_stream streams events back");
+    eprintln!("  remote-port-forward Local port → container service via SSH forward");
+    eprintln!("  remote-terminal     PTY hosted on container (whoami/hostname/pwd)");
+    eprintln!("  remote-watch        Filesystem watcher fires WorkspaceFilesChanged");
+    eprintln!("  feature-probe       Sweep of 19+ feature surfaces, JSON report");
 }
 
 async fn dispatch(subcommand: &str, rest: &[String]) -> anyhow::Result<()> {
     match subcommand {
         "scenario" => run_scenario(rest).await,
+        "probe" => run_probe(rest).await,
         "ping" | "windows" | "eval" => run_bridge_command(subcommand, rest).await,
         other => anyhow::bail!("unknown subcommand: {other}"),
     }
+}
+
+async fn run_probe(rest: &[String]) -> anyhow::Result<()> {
+    let name = rest
+        .first()
+        .ok_or_else(|| anyhow::anyhow!("probe requires a name: taper probe <name>"))?
+        .as_str();
+    let bridge = Bridge::connect(BridgeConfig::default()).await?;
+    eprintln!("connected on port {}", bridge.port());
+
+    let passed = match name {
+        "bundle-install" => {
+            bundle_install::run(&bridge, &bundle_install::Config::from_env()).await?
+        }
+        "daemon-persistence" => {
+            daemon_persistence::run(&bridge, &daemon_persistence::Config::from_env()).await?
+        }
+        "remote-agent" => remote_agent::run(&bridge, &remote_agent::Config::from_env()).await?,
+        "remote-port-forward" => {
+            remote_port_forward::run(&bridge, &remote_port_forward::Config::from_env()).await?
+        }
+        "remote-terminal" => {
+            remote_terminal::run(&bridge, &remote_terminal::Config::from_env()).await?
+        }
+        "remote-watch" => remote_watch::run(&bridge, &remote_watch::Config::from_env()).await?,
+        "feature-probe" => feature_probe::run(&bridge, &feature_probe::Config::from_env()).await?,
+        other => anyhow::bail!(
+            "unknown probe: {other}. Available: bundle-install, daemon-persistence, remote-agent, remote-port-forward, remote-terminal, remote-watch, feature-probe"
+        ),
+    };
+    if !passed {
+        std::process::exit(1);
+    }
+    Ok(())
 }
 
 async fn run_bridge_command(subcommand: &str, rest: &[String]) -> anyhow::Result<()> {
