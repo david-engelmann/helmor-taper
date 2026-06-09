@@ -21,7 +21,8 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use helmor_taper::scenarios::{
-    add_remote_wizard, connect_over_ssh, observability, remote_workspace, row_actions,
+    add_remote_wizard, connect_over_ssh, first_connect_bundle, observability, remote_file_ops,
+    remote_workspace, resilience, row_actions,
 };
 use helmor_taper::{
     Bridge, BridgeConfig, PostProcessing, ScreenCaptureKitRecorder, TapeBuilder,
@@ -75,6 +76,9 @@ fn print_usage(prog: &str) {
     eprintln!("  row-actions         Auth / Diagnostics / Disconnect affordances per row");
     eprintln!("  observability       Runtime Debug → diagnostics + metrics + log tail");
     eprintln!("  add-remote-wizard   Add-remote wizard surfaces SSH state pre-connect");
+    eprintln!("  resilience          docker stop → banner → Reconnect → green");
+    eprintln!("  first-connect-bundle Auto-install agent runtime on first connect");
+    eprintln!("  remote-file-ops     File tree + changes route to the container");
 }
 
 async fn dispatch(subcommand: &str, rest: &[String]) -> anyhow::Result<()> {
@@ -161,8 +165,15 @@ async fn run_scenario(rest: &[String]) -> anyhow::Result<()> {
         "add-remote-wizard" => {
             add_remote_wizard::run(&mut tape, &add_remote_wizard::Config::from_env()).await?
         }
+        "resilience" => resilience::run(&mut tape, &resilience::Config::from_env()).await?,
+        "first-connect-bundle" => {
+            first_connect_bundle::run(&mut tape, &first_connect_bundle::Config::from_env()).await?
+        }
+        "remote-file-ops" => {
+            remote_file_ops::run(&mut tape, &remote_file_ops::Config::from_env()).await?
+        }
         other => anyhow::bail!(
-            "unknown scenario: {other}. Available: connect-over-ssh, remote-workspace, row-actions, observability, add-remote-wizard"
+            "unknown scenario: {other}. Available: connect-over-ssh, remote-workspace, row-actions, observability, add-remote-wizard, resilience, first-connect-bundle, remote-file-ops"
         ),
     };
 

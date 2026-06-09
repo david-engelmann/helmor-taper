@@ -385,6 +385,48 @@ impl Tape {
         self.js(&script).await
     }
 
+    /// Click the first `<button>` whose `innerText.trim()` equals
+    /// `text`. Returns true on hit. Used by scenarios that need to
+    /// activate a button without a stable `data-testid` (the
+    /// `<Button>{text}</Button>` shape).
+    pub async fn click_button_by_text(&self, text: &str) -> Result<bool> {
+        let script = format!(
+            r#"var bs=document.querySelectorAll('button');
+               for(var i=0;i<bs.length;i++){{
+                 if((bs[i].innerText||'').trim()=={t}){{ bs[i].click(); return true; }}
+               }} return false;"#,
+            t = serde_json::to_string(text)?,
+        );
+        self.js(&script).await
+    }
+
+    /// Poll until `needle` appears anywhere inside `scope_selector`'s
+    /// `innerText`. Returns true on hit, false on timeout. Used by
+    /// scenarios that wait for an async UI update to render its
+    /// payload (e.g. "Run file tree" populating a list).
+    pub async fn wait_for_text(
+        &self,
+        scope_selector: &str,
+        needle: &str,
+        timeout: Duration,
+    ) -> Result<bool> {
+        let script = format!(
+            r#"var s=document.querySelector({sel});
+               return !!s && (s.innerText||'').indexOf({needle})>=0;"#,
+            sel = serde_json::to_string(scope_selector)?,
+            needle = serde_json::to_string(needle)?,
+        );
+        let deadline = Instant::now() + timeout;
+        while Instant::now() < deadline {
+            let hit: bool = self.js(&script).await?;
+            if hit {
+                return Ok(true);
+            }
+            sleep(Duration::from_millis(300)).await;
+        }
+        Ok(false)
+    }
+
     /// Scroll the section containing `selector` to the top of its
     /// scrollable parent. Used by tapes that capture different cards
     /// in a long Settings pane — each beat brings its card into view
