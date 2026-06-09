@@ -21,8 +21,9 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use helmor_taper::scenarios::{
-    add_remote_wizard, connect_over_ssh, first_connect_bundle, isolation_proof, observability,
-    remote_file_ops, remote_runner, remote_workspace, resilience, row_actions,
+    add_remote_wizard, agent_on_remote, chat_real_on_remote, connect_over_ssh, end_to_end_demo,
+    first_connect_bundle, isolation_proof, observability, remote_file_ops, remote_runner,
+    remote_workspace, resilience, row_actions,
 };
 use helmor_taper::{
     Bridge, BridgeConfig, PostProcessing, ScreenCaptureKitRecorder, TapeBuilder,
@@ -81,6 +82,9 @@ fn print_usage(prog: &str) {
     eprintln!("  remote-file-ops     File tree + changes route to the container");
     eprintln!("  remote-runner       SSH connect + backend-truth: list_remote_runtimes");
     eprintln!("  isolation-proof     Chat exchanges prove agent runs on container");
+    eprintln!("  agent-on-remote     send_agent_message_stream → session row populates");
+    eprintln!("  chat-real-on-remote Composer-driven chat: ls + README + file creation");
+    eprintln!("  end-to-end-demo     THE demo — full user journey, 75-90s gif");
 }
 
 async fn dispatch(subcommand: &str, rest: &[String]) -> anyhow::Result<()> {
@@ -180,8 +184,17 @@ async fn run_scenario(rest: &[String]) -> anyhow::Result<()> {
         "isolation-proof" => {
             isolation_proof::run(&mut tape, &isolation_proof::Config::from_env()).await?
         }
+        "agent-on-remote" => {
+            agent_on_remote::run(&mut tape, &agent_on_remote::Config::from_env()).await?
+        }
+        "chat-real-on-remote" => {
+            chat_real_on_remote::run(&mut tape, &chat_real_on_remote::Config::from_env()).await?
+        }
+        "end-to-end-demo" => {
+            end_to_end_demo::run(&mut tape, &end_to_end_demo::Config::from_env()).await?
+        }
         other => anyhow::bail!(
-            "unknown scenario: {other}. Available: connect-over-ssh, remote-workspace, row-actions, observability, add-remote-wizard, resilience, first-connect-bundle, remote-file-ops, remote-runner, isolation-proof"
+            "unknown scenario: {other}. Available: connect-over-ssh, remote-workspace, row-actions, observability, add-remote-wizard, resilience, first-connect-bundle, remote-file-ops, remote-runner, isolation-proof, agent-on-remote, chat-real-on-remote, end-to-end-demo"
         ),
     };
 

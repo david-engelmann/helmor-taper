@@ -13,7 +13,8 @@ use std::sync::{Arc, Mutex};
 
 use futures_util::{SinkExt, StreamExt};
 use helmor_taper::scenarios::{
-    add_remote_wizard, connect_over_ssh, first_connect_bundle, observability, remote_file_ops,
+    add_remote_wizard, agent_on_remote, chat_real_on_remote, connect_over_ssh, end_to_end_demo,
+    first_connect_bundle, isolation_proof, observability, remote_file_ops, remote_runner,
     remote_workspace, resilience, row_actions,
 };
 use helmor_taper::{Bridge, BridgeConfig, NullRecorder, ResultSummary, TapeBuilder};
@@ -655,5 +656,43 @@ async fn remote_file_ops_config_is_wired() {
     let cfg = remote_file_ops::Config::from_env();
     assert_eq!(cfg.runtime_name, "docker-linux-arm64");
     assert!(cfg.local_workspace_dir.starts_with("/Users/david"));
+}
+
+// ── remote-runner / agent-on-remote / chat-real-on-remote / isolation-proof /
+//    end-to-end-demo (smoke tests; full paths need docker + LM Studio) ────
+
+#[tokio::test]
+async fn remote_runner_config_is_wired() {
+    let cfg = remote_runner::Config::from_env();
+    assert_eq!(cfg.runtime_name, "docker-linux-arm64");
+    assert_eq!(cfg.host_alias, "helmor-taper-arm64");
+}
+
+#[tokio::test]
+async fn agent_on_remote_config_is_wired() {
+    let cfg = agent_on_remote::Config::from_env();
+    assert_eq!(cfg.runtime_name, "docker-linux-arm64");
+    assert!(cfg.prompt.contains("isolated"));
+}
+
+#[tokio::test]
+async fn chat_real_on_remote_config_is_wired() {
+    let cfg = chat_real_on_remote::Config::from_env();
+    assert_eq!(cfg.runtime_name, "docker-linux-arm64");
+    assert!(cfg.local_workspace_dir.contains("hamal"));
+}
+
+#[tokio::test]
+async fn isolation_proof_config_is_wired() {
+    let cfg = isolation_proof::Config::from_env();
+    assert_eq!(cfg.runtime_name, "docker-linux-arm64");
+    assert!(cfg.db_path.ends_with("helmor.db"));
+}
+
+#[tokio::test]
+async fn end_to_end_demo_config_is_wired() {
+    let cfg = end_to_end_demo::Config::from_env();
+    assert_eq!(cfg.runtime_name, "docker-linux-arm64");
+    assert_eq!(cfg.host_alias, "helmor-taper-arm64");
 }
 

@@ -19,7 +19,10 @@
 //! scenario.
 
 pub mod add_remote_wizard;
+pub mod agent_on_remote;
+pub mod chat_real_on_remote;
 pub mod connect_over_ssh;
+pub mod end_to_end_demo;
 pub mod first_connect_bundle;
 pub mod isolation_proof;
 pub mod observability;
