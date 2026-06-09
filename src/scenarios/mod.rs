@@ -21,8 +21,10 @@
 pub mod add_remote_wizard;
 pub mod connect_over_ssh;
 pub mod first_connect_bundle;
+pub mod isolation_proof;
 pub mod observability;
 pub mod remote_file_ops;
+pub mod remote_runner;
 pub mod remote_workspace;
 pub mod resilience;
 pub mod row_actions;

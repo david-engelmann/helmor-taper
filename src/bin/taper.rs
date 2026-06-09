@@ -21,8 +21,8 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use helmor_taper::scenarios::{
-    add_remote_wizard, connect_over_ssh, first_connect_bundle, observability, remote_file_ops,
-    remote_workspace, resilience, row_actions,
+    add_remote_wizard, connect_over_ssh, first_connect_bundle, isolation_proof, observability,
+    remote_file_ops, remote_runner, remote_workspace, resilience, row_actions,
 };
 use helmor_taper::{
     Bridge, BridgeConfig, PostProcessing, ScreenCaptureKitRecorder, TapeBuilder,
@@ -79,6 +79,8 @@ fn print_usage(prog: &str) {
     eprintln!("  resilience          docker stop → banner → Reconnect → green");
     eprintln!("  first-connect-bundle Auto-install agent runtime on first connect");
     eprintln!("  remote-file-ops     File tree + changes route to the container");
+    eprintln!("  remote-runner       SSH connect + backend-truth: list_remote_runtimes");
+    eprintln!("  isolation-proof     Chat exchanges prove agent runs on container");
 }
 
 async fn dispatch(subcommand: &str, rest: &[String]) -> anyhow::Result<()> {
@@ -172,8 +174,14 @@ async fn run_scenario(rest: &[String]) -> anyhow::Result<()> {
         "remote-file-ops" => {
             remote_file_ops::run(&mut tape, &remote_file_ops::Config::from_env()).await?
         }
+        "remote-runner" => {
+            remote_runner::run(&mut tape, &remote_runner::Config::from_env()).await?
+        }
+        "isolation-proof" => {
+            isolation_proof::run(&mut tape, &isolation_proof::Config::from_env()).await?
+        }
         other => anyhow::bail!(
-            "unknown scenario: {other}. Available: connect-over-ssh, remote-workspace, row-actions, observability, add-remote-wizard, resilience, first-connect-bundle, remote-file-ops"
+            "unknown scenario: {other}. Available: connect-over-ssh, remote-workspace, row-actions, observability, add-remote-wizard, resilience, first-connect-bundle, remote-file-ops, remote-runner, isolation-proof"
         ),
     };
 

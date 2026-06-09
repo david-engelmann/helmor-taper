@@ -211,6 +211,13 @@ pub async fn run(tape: &mut Tape, config: &Config) -> Result<bool> {
     .await
 }
 
+/// Public wrapper around the (private) semver-shape check so sibling
+/// scenarios (e.g. [`crate::scenarios::remote_runner`]) can reuse it
+/// without duplicating the predicate.
+pub fn regex_like_semver_check_pub(v: &str) -> bool {
+    regex_like_semver_check(v)
+}
+
 /// Tiny version-shape check. Avoids pulling in `regex` for one site —
 /// the TS port used `/^\d+\.\d+\.\d+/`.
 fn regex_like_semver_check(v: &str) -> bool {
