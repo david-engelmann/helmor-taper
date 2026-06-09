@@ -9,10 +9,14 @@
 //! the `scripts/record-window.swift` shim.
 
 mod assertion;
+mod post;
 mod recorder;
+mod screencapturekit;
 
 pub use assertion::{Assertion, ResultSummary};
+pub use post::{convert_mov_to_mp4, convert_mp4_to_gif, PostError};
 pub use recorder::{NullRecorder, Recorder, RecorderError};
+pub use screencapturekit::{ScreenCaptureKitRecorder, DEFAULT_OWNER};
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -84,13 +88,45 @@ struct ContinuousState {
     gif_max_width: u32,
 }
 
+/// Continuous-mode post-processing config: where the swift binary
+/// lives and which scripts to run. Used by [`Tape::finish`] when a
+/// recording was started.
+#[derive(Debug, Clone)]
+pub struct PostProcessing {
+    pub swift_bin: PathBuf,
+    pub mov_to_mp4_script: PathBuf,
+    pub mp4_to_gif_script: PathBuf,
+}
+
+impl PostProcessing {
+    /// Default layout: `swift` on `PATH`, scripts in
+    /// `<repo>/scripts/`. Use this when running scenarios from the
+    /// repo checkout.
+    pub fn from_scripts_dir(scripts_dir: impl Into<PathBuf>) -> Self {
+        let dir = scripts_dir.into();
+        Self {
+            swift_bin: PathBuf::from("swift"),
+            mov_to_mp4_script: dir.join("mov-to-mp4.swift"),
+            mp4_to_gif_script: dir.join("mp4-to-gif.swift"),
+        }
+    }
+
+    /// Override the swift binary path. Used in tests to substitute a
+    /// shell shim.
+    pub fn with_swift_bin(mut self, path: impl Into<PathBuf>) -> Self {
+        self.swift_bin = path.into();
+        self
+    }
+}
+
 /// Builder for [`Tape`]. Use this when you want to swap in a custom
-/// recorder (e.g. `NullRecorder` for tests).
+/// recorder (e.g. `NullRecorder` for tests) or skip post-processing.
 pub struct TapeBuilder {
     name: String,
     out_dir: PathBuf,
     bridge_config: BridgeConfig,
     recorder: Box<dyn Recorder>,
+    post_processing: Option<PostProcessing>,
 }
 
 impl TapeBuilder {
@@ -100,6 +136,7 @@ impl TapeBuilder {
             out_dir: out_dir.into(),
             bridge_config: BridgeConfig::default(),
             recorder: Box::new(NullRecorder::default()),
+            post_processing: None,
         }
     }
 
@@ -110,6 +147,13 @@ impl TapeBuilder {
 
     pub fn recorder(mut self, recorder: Box<dyn Recorder>) -> Self {
         self.recorder = recorder;
+        self
+    }
+
+    /// Enable continuous-mode post-processing (.mov → .mp4 → .gif).
+    /// Without this, [`Tape::finish`] leaves the .mov in place.
+    pub fn post_processing(mut self, pp: PostProcessing) -> Self {
+        self.post_processing = Some(pp);
         self
     }
 
@@ -131,6 +175,7 @@ impl TapeBuilder {
             beats: Vec::new(),
             scene_idx: 0,
             recorder: Arc::new(Mutex::new(self.recorder)),
+            post_processing: self.post_processing,
         })
     }
 
@@ -148,6 +193,7 @@ impl TapeBuilder {
             beats: Vec::new(),
             scene_idx: 0,
             recorder: Arc::new(Mutex::new(self.recorder)),
+            post_processing: self.post_processing,
         }
     }
 }
@@ -167,6 +213,7 @@ pub struct Tape {
     beats: Vec<ContinuousBeat>,
     scene_idx: usize,
     recorder: Arc<Mutex<Box<dyn Recorder>>>,
+    post_processing: Option<PostProcessing>,
 }
 
 impl Tape {
@@ -367,16 +414,46 @@ impl Tape {
             format!("failed to write {}", result_path.display())
         })?;
 
-        if let Some(ref state) = self.continuous {
-            let mut recorder = self.recorder.lock().await;
-            recorder.wait_for_finish()?;
+        if let Some(state) = self.continuous.take() {
+            // Wait for the recorder to finish writing the .mov.
+            {
+                let mut recorder = self.recorder.lock().await;
+                recorder.wait_for_finish()?;
+            }
             self.log(&format!(
                 "recording finished → {}",
                 state.mov_path.display()
             ));
-            // Post-processing (mov→mp4→gif) lands in Phase R3 — the
-            // recorder leaves the .mov in place and the next phase
-            // adds the conversion step.
+
+            if let Some(ref pp) = self.post_processing {
+                let mp4_path = state.mov_path.with_extension("mp4");
+                let gif_path = state.mov_path.with_extension("gif");
+                self.log(&format!(
+                    "post: mov → mp4 ({} → {})",
+                    state.mov_path.display(),
+                    mp4_path.display()
+                ));
+                post::convert_mov_to_mp4(
+                    &pp.swift_bin,
+                    &pp.mov_to_mp4_script,
+                    &state.mov_path,
+                    &mp4_path,
+                )?;
+                self.log(&format!(
+                    "post: mp4 → gif (fps={} max_w={})",
+                    state.gif_fps, state.gif_max_width
+                ));
+                post::convert_mp4_to_gif(
+                    &pp.swift_bin,
+                    &pp.mp4_to_gif_script,
+                    &mp4_path,
+                    &gif_path,
+                    state.gif_fps,
+                    state.gif_max_width,
+                )?;
+            } else {
+                self.log("post: skipped (no PostProcessing configured)");
+            }
         }
 
         self.log(&format!("finished; passed={passed}"));

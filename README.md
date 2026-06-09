@@ -17,26 +17,26 @@ rewrite landed alongside it in Phase R1 (the MCP bridge client crate). The
 TypeScript scaffolding stays in place until the Rust port reaches feature
 parity; then it gets removed in one sweep.
 
-Today (Phase R2):
+Today (Phase R3):
 - `cargo build --all-targets` → clean.
-- `cargo test` → **43 / 43 passing**:
-  - 7 protocol unit tests (request/response shape, round-trip, error fallthrough)
-  - 8 client unit tests (port-scan, echo round-trip, concurrent fan-out, timeout, error-frame surfacing)
-  - 6 commands unit tests (PollResult shape, base64 decode round-trip)
-  - 14 tape unit tests (SceneSpec builder, ContinuousBeat round-trip, ISO timestamp formatter against known epoch points, leap-year handling, civil_from_days at century boundaries, NullRecorder lifecycle, Assertion serde + skip_empty_detail, ResultSummary flattened-extras + omit-empty-beats)
-  - 8 tape integration tests against a mock bridge (assertions → result.json, continuous-mode beats, click helper drives JS, wait_for polls until selector appears, open_settings dispatches the right CustomEvent, scene-without-start_recording errors cleanly, double start_recording errors, finish mkdir-p's the out dir)
+- `cargo test` → **57 / 57 passing**:
+  - R1 (15): 7 protocol unit tests + 8 client unit tests (port-scan, echo round-trip, concurrent fan-out, timeout, error-frame surfacing).
+  - R2 (28): 6 commands unit tests + 14 tape unit tests + 8 tape integration tests against a mock bridge.
+  - R3 (14): 7 ScreenCaptureKit recorder tests (happy path, non-zero exit surfaces stderr, double-start errors, wait-before-start errors, missing binary, Drop reaps orphan child, arg layout sanity) + 4 post-processing unit tests (mov→mp4 happy path, mp4→gif fps/maxWidth pass-through, non-zero exit propagates stderr + tool name, missing binary surfaces tool name) + 2 new end-to-end integration tests (full continuous-mode pipeline with record + post-processing wired via shell shims; post-processing failure propagates through Tape::finish).
 - `cargo run --bin taper -- ping` → smoke-tests against a live Helmor's MCP bridge if `bun run dev` is up.
 
 What's in:
 - `src/bridge/{mod,protocol,client}.rs` — WebSocket client (Phase R1).
 - `src/commands.rs` — `execute_js`, `invoke_command`, `poll_result`, `invoke_and_wait`, `capture_screenshot` (Phase R2).
 - `src/tape/{mod,assertion,recorder}.rs` — `Tape`, `TapeBuilder`, `SceneSpec`, `ContinuousBeat`, `ResultSummary`, `Recorder` trait + `NullRecorder` (Phase R2).
-- `tests/tape_integration.rs` — end-to-end Tape API exercised against an in-process mock bridge (Phase R2).
+- `src/tape/screencapturekit.rs` — `ScreenCaptureKitRecorder` (Phase R3); spawns `scripts/record-window.swift` with the same arg layout the TS port uses, captures stderr for diagnostic surfacing, reaps the child on Drop so a scenario panic doesn't leak the swift process.
+- `src/tape/post.rs` — `convert_mov_to_mp4` + `convert_mp4_to_gif` wrappers around the two Swift conversion shims, with structured errors that name the failing tool + capture stderr (Phase R3).
+- `PostProcessing` struct on `TapeBuilder` — optional config that wires the mov→mp4→gif chain into `Tape::finish`. Continuous-mode tapes now produce all three artifacts end-to-end (Phase R3).
+- `tests/tape_integration.rs` — end-to-end Tape API exercised against an in-process mock bridge (Phase R2 + R3).
 
-What's stubbed (Phase R3 fills in):
-- `Recorder` trait has a `NullRecorder` for tests; the `ScreenCaptureKitRecorder` that shells out to `scripts/record-window.swift` lands in R3.
-- Continuous-mode `finish` writes `result.json` + waits for the recorder; the `.mov → .mp4 → .gif` post-processing chain still uses the existing Swift scripts via the TypeScript scaffolding.
-- Scene mode (per-clip capture with burned-in captions) errors with "not yet implemented" — scenarios that need it stay on the TypeScript implementation until R3.
+What's stubbed (Phase R4 fills in):
+- Scene mode (per-clip capture with burned-in captions) errors with "not yet implemented" — the headline tapes use continuous mode and don't need this; the older per-feature tapes do.
+- No scenarios have been ported to Rust yet — the TypeScript `scenarios/*.ts` still drive the actual recording sessions until Phase R4 ports them one by one.
 
 The TypeScript implementation (`scripts/mcp-bridge.ts`, `scenarios/*.ts`)
 stays in place during the migration. README note will get pruned once

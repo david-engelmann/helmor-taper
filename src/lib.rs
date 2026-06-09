@@ -36,6 +36,7 @@ pub use commands::{
     DEFAULT_WINDOW,
 };
 pub use tape::{
-    Assertion, ContinuousBeat, NullRecorder, Recorder, RecorderError, ResultSummary, SceneSpec,
-    Tape, TapeBuilder,
+    convert_mov_to_mp4, convert_mp4_to_gif, Assertion, ContinuousBeat, NullRecorder, PostError,
+    PostProcessing, Recorder, RecorderError, ResultSummary, SceneSpec, ScreenCaptureKitRecorder,
+    Tape, TapeBuilder, DEFAULT_OWNER,
 };

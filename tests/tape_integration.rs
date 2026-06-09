@@ -7,7 +7,10 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use futures_util::{SinkExt, StreamExt};
-use helmor_taper::{BridgeConfig, NullRecorder, ResultSummary, SceneSpec, TapeBuilder};
+use helmor_taper::{
+    BridgeConfig, NullRecorder, PostProcessing, ResultSummary, SceneSpec, ScreenCaptureKitRecorder,
+    TapeBuilder,
+};
 use serde_json::{json, Value};
 use tempfile::tempdir;
 use tokio::net::TcpListener;
@@ -203,4 +206,196 @@ async fn tape_finish_writes_out_dir_when_missing() {
     tape.assert("ok", true, "");
     tape.finish(json!({})).await.unwrap();
     assert!(nested.join("result.json").exists());
+}
+
+/// Build a directory of swell shims that mimic the four swift tools
+/// well enough to wire Tape's end-to-end recording + post-processing
+/// without invoking ScreenCaptureKit. Returns (record_shim, post_shim).
+///
+/// The recorder shim writes `FAKE_MOV` to its out-path argument; the
+/// post-processing shim copies its input to its output so the
+/// .mov → .mp4 → .gif chain produces files at the expected paths.
+fn make_recording_shims(dir: &std::path::Path) -> (PathBuf, PathBuf, PathBuf) {
+    use std::os::unix::fs::PermissionsExt;
+    let record = dir.join("record-shim.sh");
+    std::fs::write(
+        &record,
+        r#"#!/usr/bin/env bash
+# args: $1=<script-arg> $2=<owner> $3=<duration> $4=<out.mov>
+printf 'FAKE_MOV' > "$4"
+exit 0
+"#,
+    )
+    .unwrap();
+    let mut p = std::fs::metadata(&record).unwrap().permissions();
+    p.set_mode(0o755);
+    std::fs::set_permissions(&record, p).unwrap();
+
+    let mov_to_mp4 = dir.join("mov2mp4.sh");
+    std::fs::write(
+        &mov_to_mp4,
+        r#"#!/usr/bin/env bash
+# args: $1=<script-arg> $2=<input.mov> $3=<output.mp4>
+cp "$2" "$3"
+exit 0
+"#,
+    )
+    .unwrap();
+    let mut p = std::fs::metadata(&mov_to_mp4).unwrap().permissions();
+    p.set_mode(0o755);
+    std::fs::set_permissions(&mov_to_mp4, p).unwrap();
+
+    let mp4_to_gif = dir.join("mp42gif.sh");
+    std::fs::write(
+        &mp4_to_gif,
+        r#"#!/usr/bin/env bash
+# args: $1=<script-arg> $2=<input.mp4> $3=<output.gif> $4=<fps> $5=<maxWidth>
+# Sanity: confirm fps + maxWidth threaded through.
+[ -z "$4" ] && { echo "missing fps" >&2; exit 11; }
+[ -z "$5" ] && { echo "missing maxWidth" >&2; exit 12; }
+printf 'FAKE_GIF_%s_%s' "$4" "$5" > "$3"
+exit 0
+"#,
+    )
+    .unwrap();
+    let mut p = std::fs::metadata(&mp4_to_gif).unwrap().permissions();
+    p.set_mode(0o755);
+    std::fs::set_permissions(&mp4_to_gif, p).unwrap();
+
+    (record, mov_to_mp4, mp4_to_gif)
+}
+
+#[tokio::test]
+async fn tape_full_continuous_mode_pipeline_with_post_processing() {
+    let dir = tempdir().unwrap();
+    let shim_dir = dir.path().join("shims");
+    std::fs::create_dir(&shim_dir).unwrap();
+    let (record_shim, mov2mp4_shim, mp42gif_shim) = make_recording_shims(&shim_dir);
+    let tape_dir = dir.path().join("tape-out");
+
+    let port = spawn_mock_bridge().await;
+    let url = format!("ws://127.0.0.1:{port}");
+    let bridge = helmor_taper::Bridge::connect_direct(&url, BridgeConfig::default())
+        .await
+        .unwrap();
+
+    let recorder = Box::new(
+        ScreenCaptureKitRecorder::new(PathBuf::from("ignored-script-arg"))
+            .with_swift_bin(record_shim),
+    );
+    // PostProcessing models a single swift_bin path used by both
+    // tool invocations. For the happy-path test we build a dual-
+    // purpose shim that sniffs argv: 4 args → mov→mp4 passthrough
+    // copy; 5 args → mp4→gif stamped output that lets the test
+    // assert fps + maxWidth were threaded through correctly.
+    let _ = (mov2mp4_shim, mp42gif_shim);
+    let dual_shim = shim_dir.join("dual-purpose.sh");
+    std::fs::write(
+        &dual_shim,
+        r#"#!/usr/bin/env bash
+# args: $1=<script-arg> $2=<input> $3=<output> [$4=<fps> $5=<maxWidth>]
+# Dual-purpose: if a 4th arg is present, behave as mp4→gif. Otherwise mov→mp4.
+if [ -n "$4" ]; then
+  # mp4 -> gif: write a stamped gif so the test can assert fps + maxWidth.
+  printf 'FAKE_GIF_%s_%s' "$4" "$5" > "$3"
+else
+  # mov -> mp4: passthrough copy.
+  cp "$2" "$3"
+fi
+exit 0
+"#,
+    )
+    .unwrap();
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut p = std::fs::metadata(&dual_shim).unwrap().permissions();
+        p.set_mode(0o755);
+        std::fs::set_permissions(&dual_shim, p).unwrap();
+    }
+    let post = PostProcessing {
+        swift_bin: dual_shim,
+        mov_to_mp4_script: PathBuf::from("mov2mp4-script-arg"),
+        mp4_to_gif_script: PathBuf::from("mp42gif-script-arg"),
+    };
+
+    let mut tape = TapeBuilder::new("e2e-pipeline", &tape_dir)
+        .recorder(recorder)
+        .post_processing(post)
+        .build_disconnected(bridge);
+
+    tape.start_recording(2, 5, 720).await.unwrap();
+    tape.scene(SceneSpec::new("first beat").hold_sec(0)).await.unwrap();
+    tape.scene(SceneSpec::new("second beat").hold_sec(0)).await.unwrap();
+    let passed = tape.finish(json!({"shim_pipeline": true})).await.unwrap();
+    assert!(passed);
+
+    // Recorded .mov is what the recorder shim wrote.
+    let mov = tape_dir.join("master.mov");
+    assert_eq!(std::fs::read(&mov).unwrap(), b"FAKE_MOV");
+    // Post-processing produced both downstream artifacts.
+    let mp4 = tape_dir.join("master.mp4");
+    let gif = tape_dir.join("master.gif");
+    assert_eq!(std::fs::read(&mp4).unwrap(), b"FAKE_MOV", "mov2mp4 copies bytes verbatim");
+    let gif_bytes = std::fs::read(&gif).unwrap();
+    let gif_str = String::from_utf8(gif_bytes).unwrap();
+    assert!(gif_str.contains("FAKE_GIF_5_720"), "gif shim received fps/maxWidth: {gif_str}");
+
+    // result.json carries the beats + the flattened scenario extra.
+    let summary: ResultSummary =
+        serde_json::from_str(&std::fs::read_to_string(tape_dir.join("result.json")).unwrap())
+            .unwrap();
+    assert_eq!(summary.beats.len(), 2);
+    let raw: Value =
+        serde_json::from_str(&std::fs::read_to_string(tape_dir.join("result.json")).unwrap())
+            .unwrap();
+    assert_eq!(raw["shim_pipeline"], true);
+}
+
+#[tokio::test]
+async fn tape_post_processing_failure_propagates_through_finish() {
+    let dir = tempdir().unwrap();
+    let shim_dir = dir.path().join("shims");
+    std::fs::create_dir(&shim_dir).unwrap();
+    let (record_shim, _ok_mov, _ok_gif) = make_recording_shims(&shim_dir);
+    // Replace the mov-to-mp4 shim with a failing one.
+    use std::os::unix::fs::PermissionsExt;
+    let failing = shim_dir.join("mov2mp4-fail.sh");
+    std::fs::write(
+        &failing,
+        r#"#!/usr/bin/env bash
+echo "passthrough preset not available on this host" >&2
+exit 1
+"#,
+    )
+    .unwrap();
+    let mut p = std::fs::metadata(&failing).unwrap().permissions();
+    p.set_mode(0o755);
+    std::fs::set_permissions(&failing, p).unwrap();
+
+    let port = spawn_mock_bridge().await;
+    let url = format!("ws://127.0.0.1:{port}");
+    let bridge = helmor_taper::Bridge::connect_direct(&url, BridgeConfig::default())
+        .await
+        .unwrap();
+
+    let recorder = Box::new(
+        ScreenCaptureKitRecorder::new("ignored").with_swift_bin(record_shim),
+    );
+    let post = PostProcessing {
+        swift_bin: failing,
+        mov_to_mp4_script: PathBuf::from("ignored-script-arg"),
+        mp4_to_gif_script: PathBuf::from("unused"),
+    };
+    let mut tape = TapeBuilder::new("e2e-pipeline-fail", dir.path().join("out"))
+        .recorder(recorder)
+        .post_processing(post)
+        .build_disconnected(bridge);
+
+    tape.start_recording(2, 5, 720).await.unwrap();
+    let err = tape.finish(json!({})).await.expect_err("post-processing must propagate");
+    assert!(
+        err.to_string().contains("mov-to-mp4")
+            && err.to_string().contains("passthrough preset not available"),
+        "error chain should surface the failing tool name + stderr: {err:#}"
+    );
 }
