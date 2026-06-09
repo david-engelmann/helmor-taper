@@ -30,3 +30,4 @@ url = "2"
 
 [dev-dependencies]
 tokio-tungstenite = { version = "0.24", default-features = false, features = ["connect", "handshake"] }
+tempfile = "3"

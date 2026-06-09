@@ -24,8 +24,18 @@
 //! sweep so a reviewer never sees a half-migrated codebase.
 
 pub mod bridge;
+pub mod commands;
+pub mod tape;
 
 pub use bridge::{
     Bridge, BridgeConfig, BridgeError, BridgeRequest, BridgeResponse, ConnectError,
     DEFAULT_BASE_PORT, DEFAULT_HOST, DEFAULT_PORT_SCAN,
+};
+pub use commands::{
+    capture_screenshot, execute_js, invoke_and_wait, invoke_command, poll_result, PollResult,
+    DEFAULT_WINDOW,
+};
+pub use tape::{
+    Assertion, ContinuousBeat, NullRecorder, Recorder, RecorderError, ResultSummary, SceneSpec,
+    Tape, TapeBuilder,
 };
