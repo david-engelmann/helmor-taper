@@ -25,6 +25,7 @@
 
 pub mod bridge;
 pub mod commands;
+pub mod scenarios;
 pub mod tape;
 
 pub use bridge::{

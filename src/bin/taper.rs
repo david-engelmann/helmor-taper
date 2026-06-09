@@ -1,19 +1,29 @@
 //! `taper` — top-level CLI for the helmor-taper Rust port.
 //!
-//! Subcommands during the migration (Phase R1):
+//! Subcommands:
 //! - `ping` — connect to the bridge, run `list_windows`, print the
 //!   port that landed and the window count. Smoke test for "is the
 //!   bridge reachable?" without writing any code that calls into it.
 //! - `eval <script>` — evaluate JS in the `main` window via
 //!   `execute_js`, print the JSON return value.
 //! - `windows` — dump the `list_windows` payload.
+//! - `scenario <name>` — run a Rust-ported scenario by name. Reads
+//!   per-scenario config from env vars (see each scenario's
+//!   `Config::from_env`). Output dir defaults to
+//!   `./tapes/<name>`; override with `TAPE_DIR`.
 //!
-//! More subcommands land as later phases port the scenarios.
+//! Available scenarios:
+//! - `connect-over-ssh` — port of `scenarios/connect-over-ssh.ts`
+//! - `remote-workspace` — port of `scenarios/remote-workspace.ts`
 
 use std::env;
+use std::path::PathBuf;
 use std::process::ExitCode;
 
-use helmor_taper::{Bridge, BridgeConfig};
+use helmor_taper::scenarios::{connect_over_ssh, remote_workspace};
+use helmor_taper::{
+    Bridge, BridgeConfig, PostProcessing, ScreenCaptureKitRecorder, TapeBuilder,
+};
 use serde_json::json;
 
 fn main() -> ExitCode {
@@ -55,9 +65,22 @@ fn print_usage(prog: &str) {
     eprintln!("  ping                Connect to the MCP bridge + list_windows");
     eprintln!("  eval '<js>'         Run JS in the main window, print JSON result");
     eprintln!("  windows             Dump list_windows JSON");
+    eprintln!("  scenario <name>     Run a Rust-ported scenario by name");
+    eprintln!();
+    eprintln!("Scenarios:");
+    eprintln!("  connect-over-ssh    SSH connect → daemon health → connected row");
+    eprintln!("  remote-workspace    Select remote-bound workspace → header chip live");
 }
 
 async fn dispatch(subcommand: &str, rest: &[String]) -> anyhow::Result<()> {
+    match subcommand {
+        "scenario" => run_scenario(rest).await,
+        "ping" | "windows" | "eval" => run_bridge_command(subcommand, rest).await,
+        other => anyhow::bail!("unknown subcommand: {other}"),
+    }
+}
+
+async fn run_bridge_command(subcommand: &str, rest: &[String]) -> anyhow::Result<()> {
     let cfg = BridgeConfig::default();
     let bridge = Bridge::connect(cfg).await?;
     eprintln!("connected on port {}", bridge.port());
@@ -87,8 +110,52 @@ async fn dispatch(subcommand: &str, rest: &[String]) -> anyhow::Result<()> {
             println!("{}", serde_json::to_string_pretty(&result)?);
             Ok(())
         }
-        other => {
-            anyhow::bail!("unknown subcommand: {other}");
-        }
+        _ => unreachable!(),
     }
+}
+
+async fn run_scenario(rest: &[String]) -> anyhow::Result<()> {
+    let name = rest
+        .first()
+        .ok_or_else(|| anyhow::anyhow!("scenario requires a name: taper scenario <name>"))?
+        .as_str();
+
+    let out_dir = std::env::var("TAPE_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| PathBuf::from(format!("./tapes/{name}")));
+
+    let scripts_dir = std::env::var("HELMOR_TAPER_SCRIPTS_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| {
+            // Default: scripts live alongside the crate root.
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("scripts")
+        });
+
+    let recorder = Box::new(ScreenCaptureKitRecorder::new(
+        scripts_dir.join("record-window.swift"),
+    ));
+    let post = PostProcessing::from_scripts_dir(&scripts_dir);
+
+    let mut tape = TapeBuilder::new(name, &out_dir)
+        .recorder(recorder)
+        .post_processing(post)
+        .build()
+        .await?;
+
+    let passed = match name {
+        "connect-over-ssh" => {
+            connect_over_ssh::run(&mut tape, &connect_over_ssh::Config::from_env()).await?
+        }
+        "remote-workspace" => {
+            remote_workspace::run(&mut tape, &remote_workspace::Config::from_env()).await?
+        }
+        other => anyhow::bail!(
+            "unknown scenario: {other}. Available: connect-over-ssh, remote-workspace"
+        ),
+    };
+
+    if !passed {
+        std::process::exit(1);
+    }
+    Ok(())
 }

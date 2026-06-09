@@ -172,16 +172,27 @@ async fn tape_open_settings_dispatches_custom_event() {
 }
 
 #[tokio::test]
-async fn tape_scene_without_start_recording_errors() {
+async fn tape_scene_without_start_recording_is_a_no_op() {
+    // No-recording mode: scene logs + sleeps `hold_sec` but doesn't
+    // record a beat (no recording → nothing to annotate). Lets the
+    // same scenario code run in both production and headless tests
+    // without the test having to call `start_recording` first.
     let dir = tempdir().unwrap();
     let mut tape = make_tape(dir.path().to_path_buf()).await;
-    let err = tape
-        .scene(SceneSpec::new("orphan beat").hold_sec(0))
+    tape.scene(SceneSpec::new("orphan beat").hold_sec(0))
         .await
-        .expect_err("scene without start_recording must error");
+        .expect("scene without start_recording should be a no-op");
+    tape.assert("scene_did_not_error", true, "");
+    tape.finish(json!({})).await.unwrap();
+
+    let summary: ResultSummary = serde_json::from_str(
+        &std::fs::read_to_string(dir.path().join("result.json")).unwrap(),
+    )
+    .unwrap();
     assert!(
-        err.to_string().contains("not yet implemented"),
-        "got: {err}"
+        summary.beats.is_empty(),
+        "no-recording scene must NOT push a beat: {:?}",
+        summary.beats
     );
 }
 

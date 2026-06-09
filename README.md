@@ -17,9 +17,34 @@ rewrite landed alongside it in Phase R1 (the MCP bridge client crate). The
 TypeScript scaffolding stays in place until the Rust port reaches feature
 parity; then it gets removed in one sweep.
 
-Today (Phase R3):
+Today (Phase R4 — first two scenarios ported, infra for the rest):
 - `cargo build --all-targets` → clean.
-- `cargo test` → **57 / 57 passing**:
+- `cargo run --bin taper -- scenario connect-over-ssh` → drives the
+  full SSH-connect flow against a live Helmor desktop (when
+  `bun run dev` is up). `TAPE_DIR=./tapes/foo` overrides the output.
+- `cargo test` → **72 / 72 passing**:
+  - R1+R2+R3 (57): same coverage as the prior README.
+  - R4 (15): 4 scenario unit tests (`Config::from_env` defaults,
+    semver-shape predicate, `DaemonHealth` partial deserialization)
+    × 2 scenarios = 8 unit tests, plus 1 added Tape unit test for
+    "scene without start_recording is a no-op", plus 4 scenario
+    integration tests against a smarter mock bridge that understands
+    the fire-and-poll pattern + JS-substring matching, plus 2 hooked
+    bridge connect-result tests.
+- Two scenarios ported:
+  - `scenarios/connect-over-ssh.ts` → `src/scenarios/connect_over_ssh.rs`
+    (143 → ~250 LOC including config struct + semver check + 4 tests).
+  - `scenarios/remote-workspace.ts` → `src/scenarios/remote_workspace.rs`
+    (54 → ~150 LOC including config + 4 tests).
+
+The scenario test harness in `tests/scenarios_integration.rs` is the
+reusable piece for the remaining 12 scenarios: a programmable
+`MockState` with two extensibility points (Tauri command responses +
+JS substring matchers). New scenarios add tests by registering their
+expected commands + selectors in `MockState` rather than building
+bridge plumbing from scratch.
+
+Older state (kept for reference until Phase R6 deletes the TS scaffolding):
   - R1 (15): 7 protocol unit tests + 8 client unit tests (port-scan, echo round-trip, concurrent fan-out, timeout, error-frame surfacing).
   - R2 (28): 6 commands unit tests + 14 tape unit tests + 8 tape integration tests against a mock bridge.
   - R3 (14): 7 ScreenCaptureKit recorder tests (happy path, non-zero exit surfaces stderr, double-start errors, wait-before-start errors, missing binary, Drop reaps orphan child, arg layout sanity) + 4 post-processing unit tests (mov→mp4 happy path, mp4→gif fps/maxWidth pass-through, non-zero exit propagates stderr + tool name, missing binary surfaces tool name) + 2 new end-to-end integration tests (full continuous-mode pipeline with record + post-processing wired via shell shims; post-processing failure propagates through Tape::finish).

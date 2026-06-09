@@ -277,6 +277,46 @@ impl Tape {
         Ok(parsed)
     }
 
+    /// Fire a backend Tauri command WITHOUT waiting for it. The
+    /// resolution is stashed on `window.__taper[slot]`; later call
+    /// [`poll`] or [`poll_until_done`] to read it. Used by scenarios
+    /// that need to capture a "currently in flight" beat (e.g. the
+    /// "connecting…" frame while `connect_remote_runtime` is still
+    /// running) in parallel with the command.
+    pub async fn invoke_async(&self, cmd: &str, args: Value, slot: &str) -> Result<()> {
+        commands::invoke_command(&self.bridge, cmd, args, slot).await
+    }
+
+    /// Read a previously-fired command's outcome. Returns the
+    /// "not yet started" shape if `slot` was never written.
+    pub async fn poll(&self, slot: &str) -> Result<commands::PollResult> {
+        commands::poll_result(&self.bridge, slot).await
+    }
+
+    /// Poll `slot` until [`PollResult::done`] is true or `timeout`
+    /// elapses. Returns the final [`PollResult`] (which may carry a
+    /// rejection). Tighter than `invoke_and_wait` because the scenario
+    /// has already done other work between the `invoke_async` and the
+    /// poll.
+    pub async fn poll_until_done(
+        &self,
+        slot: &str,
+        timeout: Duration,
+        poll_interval: Duration,
+    ) -> Result<commands::PollResult> {
+        let deadline = Instant::now() + timeout;
+        loop {
+            let r = self.poll(slot).await?;
+            if r.done {
+                return Ok(r);
+            }
+            if Instant::now() >= deadline {
+                return Ok(r);
+            }
+            sleep(poll_interval).await;
+        }
+    }
+
     pub async fn open_settings(&self, section: &str) -> Result<()> {
         let section_json = serde_json::to_string(section)?;
         let script = format!(
@@ -366,12 +406,22 @@ impl Tape {
         Ok(())
     }
 
-    /// Mark a beat in the scenario timeline. In continuous mode this
-    /// logs + sleeps (`hold_sec`) so the running recorder captures the
-    /// right moment. In scene mode it would capture a per-scene clip;
-    /// Phase R2 lands the continuous path and stubs scene mode (caller
-    /// gets a NotImplementedError if they use scene mode without
-    /// `start_recording`).
+    /// Mark a beat in the scenario timeline.
+    ///
+    /// Three modes:
+    /// - **Continuous** (`start_recording` was called): logs + sleeps
+    ///   `hold_sec` so the running recorder captures the right moment,
+    ///   and pushes the beat into [`Tape::beats`] for `result.json`.
+    /// - **No recording** (scenarios that drive the UI but don't
+    ///   record — e.g. headless tests, smoke checks): logs + sleeps
+    ///   `hold_sec` but DOESN'T record a beat (no recording → no
+    ///   timeline to annotate). Letting `scene` be a no-op here means
+    ///   the same scenario code runs in both test and production
+    ///   contexts without the test having to call `start_recording`
+    ///   first.
+    /// - **Scene mode** (per-clip capture with burned captions): not
+    ///   yet implemented; lands in a follow-up phase. The headline
+    ///   continuous-mode tapes don't need it.
     pub async fn scene(&mut self, spec: SceneSpec) -> Result<()> {
         if let Some(ref state) = self.continuous {
             let t = state.started_at.elapsed().as_secs_f64();
@@ -383,13 +433,13 @@ impl Tape {
             sleep(Duration::from_secs(spec.hold_sec)).await;
             return Ok(());
         }
-        // Scene mode (per-clip capture) lands in Phase R3 alongside the
-        // ScreenCaptureKitRecorder; until then, scene-mode callers must
-        // upgrade to continuous mode or call `start_recording` first.
+        // No recording active. Log the marker so scenario output still
+        // reads sensibly, sleep the hold (in case the scenario depends
+        // on the wall-clock pacing), and move on.
         self.scene_idx += 1;
-        anyhow::bail!(
-            "Tape::scene without start_recording is not yet implemented (Phase R3); use start_recording for continuous mode"
-        );
+        self.log(&format!("no-rec scene — {}", spec.caption));
+        sleep(Duration::from_secs(spec.hold_sec)).await;
+        Ok(())
     }
 
     /// Finalise the tape. Writes `result.json` with the assertions +

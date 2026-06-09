@@ -1,0 +1,394 @@
+//! End-to-end scenario tests: build a `Tape` against an in-process
+//! scenario-aware mock bridge, run a Rust-ported scenario, and assert
+//! its `result.json` lands with the expected assertions + extras.
+//!
+//! The mock bridge here is smarter than the one in
+//! `tape_integration.rs` — it understands the fire-and-poll pattern
+//! Tape::invoke uses (stash on `window.__taper[slot]` + poll until
+//! done) and returns scenario-shaped payloads per command.
+
+use std::collections::HashMap;
+use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
+
+use futures_util::{SinkExt, StreamExt};
+use helmor_taper::scenarios::{connect_over_ssh, remote_workspace};
+use helmor_taper::{Bridge, BridgeConfig, NullRecorder, ResultSummary, TapeBuilder};
+use serde_json::{json, Value};
+use tempfile::tempdir;
+use tokio::net::TcpListener;
+use tokio_tungstenite::tungstenite::Message;
+
+/// Programmable mock bridge: matches each request against a list of
+/// scripted responses. The fire-and-poll pattern is modeled by
+/// tracking which Tauri commands were "fired" via execute_js and
+/// returning a {done: true, ok: true, value: ...} payload on the
+/// matching pollResult request.
+#[derive(Default, Clone)]
+struct MockState {
+    /// Tauri command → resolved value (or error) the mock should
+    /// return when the script that fires it eventually polls.
+    tauri_responses: HashMap<String, ScriptedResponse>,
+    /// Scripts that should be matched by substring → return value.
+    /// Order matters: first match wins.
+    js_substring_matchers: Vec<(String, Value)>,
+    /// Fired commands awaiting poll. Keyed by slot.
+    fired_slots: HashMap<String, ScriptedResponse>,
+    /// Audit log of every script the mock saw (for assertion).
+    pub seen_scripts: Vec<String>,
+}
+
+#[derive(Clone, Debug)]
+struct ScriptedResponse {
+    ok: bool,
+    value: Value,
+    error: Option<String>,
+}
+
+impl ScriptedResponse {
+    fn ok(value: Value) -> Self {
+        Self {
+            ok: true,
+            value,
+            error: None,
+        }
+    }
+    fn err(msg: impl Into<String>) -> Self {
+        Self {
+            ok: false,
+            value: Value::Null,
+            error: Some(msg.into()),
+        }
+    }
+}
+
+fn ok_frame(id: &str, data: Value) -> String {
+    serde_json::to_string(&json!({"id": id, "success": true, "data": data})).unwrap()
+}
+
+async fn spawn_scenario_aware_bridge(state: Arc<Mutex<MockState>>) -> u16 {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let port = listener.local_addr().unwrap().port();
+    tokio::spawn(async move {
+        while let Ok((stream, _)) = listener.accept().await {
+            let state = Arc::clone(&state);
+            tokio::spawn(async move {
+                let ws = tokio_tungstenite::accept_async(stream).await.unwrap();
+                let (mut write, mut read) = ws.split();
+                while let Some(Ok(msg)) = read.next().await {
+                    let Message::Text(text) = msg else { continue };
+                    let req: Value = serde_json::from_str(&text).unwrap();
+                    let id = req["id"].as_str().unwrap_or_default().to_string();
+                    let command = req["command"].as_str().unwrap_or_default();
+
+                    let response_data = if command == "execute_js" {
+                        let script =
+                            req["args"]["script"].as_str().unwrap_or_default().to_string();
+                        state.lock().unwrap().seen_scripts.push(script.clone());
+                        handle_execute_js(&state, &script)
+                    } else {
+                        json!(null)
+                    };
+
+                    let response = ok_frame(&id, response_data);
+                    let _ = write.send(Message::Text(response)).await;
+                }
+            });
+        }
+    });
+    port
+}
+
+fn handle_execute_js(state: &Arc<Mutex<MockState>>, script: &str) -> Value {
+    // 1. Tauri invoke-fire pattern: script contains `invoke(<cmd>, ...)`
+    //    AND assigns to `window.__taper[<slot>]`. Capture the slot +
+    //    queue the scripted response for the next poll.
+    if script.contains("window.__taper") && script.contains("invoke(") {
+        let slot = extract_slot(script);
+        let cmd = extract_invoke_cmd(script);
+        let mut s = state.lock().unwrap();
+        if let Some(resp) = s.tauri_responses.get(&cmd).cloned() {
+            s.fired_slots.insert(slot, resp);
+            return json!("started");
+        }
+        // No scripted response — record the slot as "pending forever".
+        s.fired_slots.insert(slot.clone(), ScriptedResponse::ok(Value::Null));
+        return json!("started");
+    }
+    // 2. Poll pattern: script reads `window.__taper[<slot>]`. Return
+    //    the queued response shape.
+    if script.contains("window.__taper") && script.contains("done: !!s.done") {
+        let slot = extract_slot(script);
+        let s = state.lock().unwrap();
+        if let Some(resp) = s.fired_slots.get(&slot) {
+            return json!({
+                "done": true,
+                "ok": resp.ok,
+                "value": resp.value,
+                "error": resp.error,
+            });
+        }
+        return json!({"done": false, "ok": false, "value": null, "error": null});
+    }
+    // 3. JS-substring matchers (e.g. helmor:open-settings, click, wait_for).
+    let s = state.lock().unwrap();
+    for (needle, value) in &s.js_substring_matchers {
+        if script.contains(needle) {
+            return value.clone();
+        }
+    }
+    drop(s);
+    // 4. Default: return null.
+    Value::Null
+}
+
+fn extract_slot(script: &str) -> String {
+    // Look for `window.__taper["<slot>"]` — the slot is the first
+    // quoted string after `__taper[`.
+    if let Some(start) = script.find("__taper[") {
+        let rest = &script[start + "__taper[".len()..];
+        // Skip the opening quote.
+        if let Some(qstart) = rest.find('"') {
+            let after = &rest[qstart + 1..];
+            if let Some(qend) = after.find('"') {
+                return after[..qend].to_string();
+            }
+        }
+    }
+    "<unknown>".to_string()
+}
+
+fn extract_invoke_cmd(script: &str) -> String {
+    // `invoke("<cmd>", ...)` — extract the first quoted string after `invoke(`.
+    if let Some(start) = script.find("invoke(") {
+        let rest = &script[start + "invoke(".len()..];
+        if let Some(qstart) = rest.find('"') {
+            let after = &rest[qstart + 1..];
+            if let Some(qend) = after.find('"') {
+                return after[..qend].to_string();
+            }
+        }
+    }
+    "<unknown>".to_string()
+}
+
+async fn make_tape_with_state(
+    name: &str,
+    out_dir: PathBuf,
+    state: Arc<Mutex<MockState>>,
+) -> helmor_taper::Tape {
+    let port = spawn_scenario_aware_bridge(state).await;
+    let url = format!("ws://127.0.0.1:{port}");
+    let bridge = Bridge::connect_direct(&url, BridgeConfig::default())
+        .await
+        .unwrap();
+    TapeBuilder::new(name, out_dir)
+        .recorder(Box::new(NullRecorder::default()))
+        .build_disconnected(bridge)
+}
+
+// ── connect-over-ssh ────────────────────────────────────────────────────
+
+#[tokio::test]
+async fn connect_over_ssh_happy_path_passes_all_assertions() {
+    let dir = tempdir().unwrap();
+    let out = dir.path().join("connect-over-ssh");
+
+    let state = Arc::new(Mutex::new(MockState::default()));
+    {
+        let mut s = state.lock().unwrap();
+        // Tauri commands the scenario fires.
+        s.tauri_responses.insert(
+            "disconnect_remote_runtime".into(),
+            ScriptedResponse::ok(Value::Null),
+        );
+        s.tauri_responses.insert(
+            "connect_remote_runtime".into(),
+            ScriptedResponse::ok(json!({
+                "hostname": "081e3cab7eb5",
+                "version": "0.26.0",
+                "kind": {"type": "remote", "host": "helmor-taper-arm64"},
+            })),
+        );
+        // UI driving scripts. Order matters: more-specific matchers
+        // first, since the mock returns the FIRST match.
+        s.js_substring_matchers.push((
+            "innerText.replace".to_string(),
+            json!("Connected · docker-linux-arm64 · v0.26.0"),
+        ));
+        s.js_substring_matchers
+            .push(("helmor:open-settings".to_string(), json!("ok")));
+        s.js_substring_matchers
+            .push(("KeyboardEvent".to_string(), json!("esc")));
+        s.js_substring_matchers
+            .push(("[role=dialog]".to_string(), json!(true)));
+        s.js_substring_matchers
+            .push(("remote-servers-empty".to_string(), json!(true)));
+        s.js_substring_matchers
+            .push(("remote-server-row-".to_string(), json!(true)));
+    }
+
+    let mut tape = make_tape_with_state(
+        "connect-over-ssh",
+        out.clone(),
+        Arc::clone(&state),
+    )
+    .await;
+    let cfg = connect_over_ssh::Config {
+        host: "helmor-taper-arm64".into(),
+        runtime_name: "docker-linux-arm64".into(),
+        remote_binary: "/home/e2e/.helmor/server/helmor-server".into(),
+    };
+    let passed = connect_over_ssh::run(&mut tape, &cfg).await.unwrap();
+    assert!(passed, "happy path should pass all assertions");
+
+    let summary: ResultSummary =
+        serde_json::from_str(&std::fs::read_to_string(out.join("result.json")).unwrap()).unwrap();
+    assert_eq!(summary.scenario, "connect-over-ssh");
+    let names: Vec<_> = summary.assertions.iter().map(|a| a.name.as_str()).collect();
+    assert!(names.contains(&"panel_opens"), "panel_opens: {names:?}");
+    assert!(names.contains(&"starts_empty"));
+    assert!(names.contains(&"ssh_connect_succeeds"));
+    assert!(names.contains(&"daemon_reports_remote"));
+    assert!(names.contains(&"daemon_reports_version"));
+    assert!(names.contains(&"ui_shows_connected_row"));
+    assert!(names.contains(&"row_says_connected"));
+    assert!(
+        summary.assertions.iter().all(|a| a.ok),
+        "every assertion should pass: {:?}",
+        summary.assertions
+    );
+}
+
+#[tokio::test]
+async fn connect_over_ssh_failure_marks_ssh_connect_failing() {
+    let dir = tempdir().unwrap();
+    let out = dir.path().join("connect-over-ssh-fail");
+    let state = Arc::new(Mutex::new(MockState::default()));
+    {
+        let mut s = state.lock().unwrap();
+        s.tauri_responses.insert(
+            "disconnect_remote_runtime".into(),
+            ScriptedResponse::ok(Value::Null),
+        );
+        s.tauri_responses.insert(
+            "connect_remote_runtime".into(),
+            ScriptedResponse::err("ssh: connect to host ... port 22: Connection refused"),
+        );
+        // UI scripts. Same ordering rule — specific first.
+        s.js_substring_matchers
+            .push(("innerText.replace".into(), Value::Null));
+        s.js_substring_matchers
+            .push(("helmor:open-settings".into(), json!("ok")));
+        s.js_substring_matchers
+            .push(("KeyboardEvent".into(), json!("esc")));
+        s.js_substring_matchers
+            .push(("[role=dialog]".into(), json!(true)));
+        s.js_substring_matchers
+            .push(("remote-servers-empty".into(), json!(true)));
+        // row never appears in the failure case.
+        s.js_substring_matchers
+            .push(("remote-server-row-".into(), json!(false)));
+    }
+
+    let mut tape = make_tape_with_state("connect-over-ssh-fail", out.clone(), state).await;
+    let cfg = connect_over_ssh::Config {
+        host: "unreachable-host".into(),
+        runtime_name: "docker-linux-arm64".into(),
+        remote_binary: "/home/e2e/.helmor/server/helmor-server".into(),
+    };
+    let passed = connect_over_ssh::run(&mut tape, &cfg).await.unwrap();
+    assert!(!passed, "failed connect must fail the tape");
+
+    let summary: ResultSummary =
+        serde_json::from_str(&std::fs::read_to_string(out.join("result.json")).unwrap()).unwrap();
+    let ssh_connect = summary
+        .assertions
+        .iter()
+        .find(|a| a.name == "ssh_connect_succeeds")
+        .expect("ssh_connect_succeeds must appear");
+    assert!(!ssh_connect.ok);
+    assert!(
+        ssh_connect.detail.contains("Connection refused"),
+        "detail should carry the bridge error: {}",
+        ssh_connect.detail
+    );
+}
+
+// ── remote-workspace ────────────────────────────────────────────────────
+
+#[tokio::test]
+async fn remote_workspace_happy_path_finds_binding_and_asserts_chip() {
+    let dir = tempdir().unwrap();
+    let out = dir.path().join("remote-workspace");
+    let state = Arc::new(Mutex::new(MockState::default()));
+    {
+        let mut s = state.lock().unwrap();
+        s.tauri_responses.insert(
+            "list_workspace_runtime_bindings".into(),
+            ScriptedResponse::ok(json!([
+                {"workspaceId": "ws-abc-123", "runtimeName": "docker-linux-arm64"},
+            ])),
+        );
+        // window.location.reload() — no observable result.
+        s.js_substring_matchers
+            .push(("window.location.reload".into(), json!("r")));
+        // The wait_for predicate ends with `return !!document.querySelector(...)`;
+        // match on that suffix so we don't have to model the exact
+        // JSON-escaped row-id form.
+        s.js_substring_matchers
+            .push(("data-workspace-row-id".into(), json!(true)));
+        s.js_substring_matchers
+            .push((r#"return "clicked""#.into(), json!("clicked")));
+        s.js_substring_matchers.push((
+            r#"Workspace runtime:"#.into(),
+            json!({"present": true, "label": "Workspace runtime: docker-linux-arm64"}),
+        ));
+    }
+
+    let mut tape = make_tape_with_state("remote-workspace", out.clone(), state).await;
+    let cfg = remote_workspace::Config {
+        runtime_name: "docker-linux-arm64".into(),
+    };
+    let passed = remote_workspace::run(&mut tape, &cfg).await.unwrap();
+    assert!(passed, "happy path should pass: {:#?}", out);
+
+    let summary: ResultSummary =
+        serde_json::from_str(&std::fs::read_to_string(out.join("result.json")).unwrap()).unwrap();
+    assert_eq!(summary.scenario, "remote-workspace");
+    let names: Vec<_> = summary.assertions.iter().map(|a| a.name.as_str()).collect();
+    assert!(names.contains(&"row_present"));
+    assert!(names.contains(&"header_chip_visible"));
+    assert!(names.contains(&"chip_names_runtime"));
+    // Flattened extras carry workspaceId.
+    let raw: Value =
+        serde_json::from_str(&std::fs::read_to_string(out.join("result.json")).unwrap()).unwrap();
+    assert_eq!(raw["workspaceId"], "ws-abc-123");
+}
+
+#[tokio::test]
+async fn remote_workspace_missing_binding_errors_with_clear_message() {
+    let dir = tempdir().unwrap();
+    let out = dir.path().join("remote-workspace-missing");
+    let state = Arc::new(Mutex::new(MockState::default()));
+    {
+        let mut s = state.lock().unwrap();
+        s.tauri_responses.insert(
+            "list_workspace_runtime_bindings".into(),
+            ScriptedResponse::ok(json!([])),
+        );
+    }
+
+    let mut tape = make_tape_with_state("remote-workspace-missing", out.clone(), state).await;
+    let cfg = remote_workspace::Config {
+        runtime_name: "docker-linux-arm64".into(),
+    };
+    let err = remote_workspace::run(&mut tape, &cfg)
+        .await
+        .expect_err("missing binding must propagate");
+    let msg = err.to_string();
+    assert!(
+        msg.contains("no workspace bound to docker-linux-arm64"),
+        "error should be operator-actionable: {msg}"
+    );
+}
