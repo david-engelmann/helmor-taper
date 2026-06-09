@@ -366,6 +366,39 @@ impl Tape {
         sleep(duration).await;
     }
 
+    /// Write a value into a React-controlled input. Hits the prototype
+    /// setter (so React's onChange listener fires) instead of just
+    /// assigning `.value`. Returns the script result token: `"ok"` on
+    /// success, `"no-input"` if the selector didn't match.
+    pub async fn set_input_value(&self, selector: &str, value: &str) -> Result<String> {
+        let script = format!(
+            r#"
+            var el=document.querySelector({sel});
+            if(!el) return "no-input";
+            var d=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value');
+            (d && d.set)?d.set.call(el,{val}):(el.value={val});
+            el.dispatchEvent(new Event('input',{{bubbles:true}}));
+            return "ok";"#,
+            sel = serde_json::to_string(selector)?,
+            val = serde_json::to_string(value)?,
+        );
+        self.js(&script).await
+    }
+
+    /// Scroll the section containing `selector` to the top of its
+    /// scrollable parent. Used by tapes that capture different cards
+    /// in a long Settings pane — each beat brings its card into view
+    /// before the recorder snapshots it.
+    pub async fn scroll_to_section(&self, selector: &str) -> Result<bool> {
+        let script = format!(
+            r#"var el=document.querySelector({sel}); if(!el) return false;
+               (el.closest('section')||el).scrollIntoView({{block:'start',behavior:'auto'}});
+               return true;"#,
+            sel = serde_json::to_string(selector)?,
+        );
+        self.js(&script).await
+    }
+
     /// Start a single ScreenCaptureKit recording for `duration_sec`.
     /// In continuous mode, subsequent [`Tape::scene`] calls log + sleep
     /// for the hold duration rather than capturing per-scene clips.

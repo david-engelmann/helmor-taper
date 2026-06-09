@@ -18,5 +18,8 @@
 //! the CLI doesn't have to teach itself a different flag set per
 //! scenario.
 
+pub mod add_remote_wizard;
 pub mod connect_over_ssh;
+pub mod observability;
 pub mod remote_workspace;
+pub mod row_actions;

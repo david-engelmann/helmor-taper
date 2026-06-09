@@ -20,7 +20,9 @@ use std::env;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use helmor_taper::scenarios::{connect_over_ssh, remote_workspace};
+use helmor_taper::scenarios::{
+    add_remote_wizard, connect_over_ssh, observability, remote_workspace, row_actions,
+};
 use helmor_taper::{
     Bridge, BridgeConfig, PostProcessing, ScreenCaptureKitRecorder, TapeBuilder,
 };
@@ -70,6 +72,9 @@ fn print_usage(prog: &str) {
     eprintln!("Scenarios:");
     eprintln!("  connect-over-ssh    SSH connect → daemon health → connected row");
     eprintln!("  remote-workspace    Select remote-bound workspace → header chip live");
+    eprintln!("  row-actions         Auth / Diagnostics / Disconnect affordances per row");
+    eprintln!("  observability       Runtime Debug → diagnostics + metrics + log tail");
+    eprintln!("  add-remote-wizard   Add-remote wizard surfaces SSH state pre-connect");
 }
 
 async fn dispatch(subcommand: &str, rest: &[String]) -> anyhow::Result<()> {
@@ -149,8 +154,15 @@ async fn run_scenario(rest: &[String]) -> anyhow::Result<()> {
         "remote-workspace" => {
             remote_workspace::run(&mut tape, &remote_workspace::Config::from_env()).await?
         }
+        "row-actions" => row_actions::run(&mut tape, &row_actions::Config::from_env()).await?,
+        "observability" => {
+            observability::run(&mut tape, &observability::Config::from_env()).await?
+        }
+        "add-remote-wizard" => {
+            add_remote_wizard::run(&mut tape, &add_remote_wizard::Config::from_env()).await?
+        }
         other => anyhow::bail!(
-            "unknown scenario: {other}. Available: connect-over-ssh, remote-workspace"
+            "unknown scenario: {other}. Available: connect-over-ssh, remote-workspace, row-actions, observability, add-remote-wizard"
         ),
     };
 

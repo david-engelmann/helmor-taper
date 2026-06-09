@@ -12,7 +12,9 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use futures_util::{SinkExt, StreamExt};
-use helmor_taper::scenarios::{connect_over_ssh, remote_workspace};
+use helmor_taper::scenarios::{
+    add_remote_wizard, connect_over_ssh, observability, remote_workspace, row_actions,
+};
 use helmor_taper::{Bridge, BridgeConfig, NullRecorder, ResultSummary, TapeBuilder};
 use serde_json::{json, Value};
 use tempfile::tempdir;
@@ -364,6 +366,189 @@ async fn remote_workspace_happy_path_finds_binding_and_asserts_chip() {
     let raw: Value =
         serde_json::from_str(&std::fs::read_to_string(out.join("result.json")).unwrap()).unwrap();
     assert_eq!(raw["workspaceId"], "ws-abc-123");
+}
+
+// ── row-actions ─────────────────────────────────────────────────────────
+
+#[tokio::test]
+async fn row_actions_happy_path_asserts_buttons_toast_dialog() {
+    let dir = tempdir().unwrap();
+    let out = dir.path().join("row-actions");
+    let state = Arc::new(Mutex::new(MockState::default()));
+    {
+        let mut s = state.lock().unwrap();
+        // Order: specific → generic.
+        s.js_substring_matchers.push((
+            "auth: q(".into(),
+            json!({"auth": true, "reconnect": false, "diagnostics": true, "disconnect": true}),
+        ));
+        s.js_substring_matchers.push((
+            "runtime-auth-status-configured".into(),
+            json!("not-configured"),
+        ));
+        s.js_substring_matchers
+            .push(("helmor:open-settings".into(), json!("ok")));
+        s.js_substring_matchers
+            .push(("KeyboardEvent".into(), json!("esc")));
+        // `click` returns `true` on success.
+        s.js_substring_matchers
+            .push((".click(); return true;".into(), json!(true)));
+        // wait_for predicates (return !!document.querySelector(...)).
+        s.js_substring_matchers
+            .push(("[role=dialog]".into(), json!(true)));
+        s.js_substring_matchers
+            .push(("remote-server-row-".into(), json!(true)));
+        s.js_substring_matchers
+            .push(("data-sonner-toast".into(), json!(true)));
+        s.js_substring_matchers
+            .push(("runtime-auth-dialog".into(), json!(true)));
+        s.js_substring_matchers
+            .push(("window.location.reload".into(), json!("r")));
+    }
+    let mut tape = make_tape_with_state("row-actions", out.clone(), state).await;
+    let cfg = row_actions::Config {
+        runtime_name: "docker-linux-arm64".into(),
+    };
+    let passed = row_actions::run(&mut tape, &cfg).await.unwrap();
+    assert!(passed, "happy path should pass");
+
+    let summary: ResultSummary =
+        serde_json::from_str(&std::fs::read_to_string(out.join("result.json")).unwrap()).unwrap();
+    let names: Vec<_> = summary.assertions.iter().map(|a| a.name.as_str()).collect();
+    assert!(names.contains(&"panel_opens"));
+    assert!(names.contains(&"row_present"));
+    assert!(names.contains(&"auth_button"));
+    assert!(names.contains(&"diagnostics_button"));
+    assert!(names.contains(&"disconnect_button"));
+    assert!(names.contains(&"diagnostics_toast"));
+    assert!(names.contains(&"auth_dialog_opens"));
+    assert!(names.contains(&"auth_status_shown"));
+    // authStatus extra survives flattening.
+    let raw: Value =
+        serde_json::from_str(&std::fs::read_to_string(out.join("result.json")).unwrap()).unwrap();
+    assert_eq!(raw["authStatus"], "not-configured");
+}
+
+// ── observability ───────────────────────────────────────────────────────
+
+#[tokio::test]
+async fn observability_happy_path_asserts_diagnostics_metrics_log() {
+    let dir = tempdir().unwrap();
+    let out = dir.path().join("observability");
+    let state = Arc::new(Mutex::new(MockState::default()));
+    {
+        let mut s = state.lock().unwrap();
+        // Tauri command response.
+        s.tauri_responses.insert(
+            "list_remote_runtimes".into(),
+            ScriptedResponse::ok(json!([
+                {"name": "docker-linux-arm64", "state": {"type": "connected"}},
+            ])),
+        );
+        // Most-specific readouts FIRST so they win against the
+        // wait_for predicates that share the same testid.
+        s.js_substring_matchers
+            .push(("innerText.replace".into(), json!("ping 14ms · transport ok")));
+        s.js_substring_matchers
+            .push(("querySelectorAll('tr').length".into(), json!(7)));
+        s.js_substring_matchers
+            .push(("innerText.split".into(), json!(50)));
+        s.js_substring_matchers
+            .push(("scrollIntoView".into(), json!(true)));
+        s.js_substring_matchers
+            .push(("helmor:open-settings".into(), json!("ok")));
+        s.js_substring_matchers
+            .push((".click(); return true;".into(), json!(true)));
+        s.js_substring_matchers
+            .push(("data-sonner-toast".into(), json!(true)));
+        s.js_substring_matchers
+            .push(("[role=dialog]".into(), json!(true)));
+        s.js_substring_matchers
+            .push(("connection-diagnostics-card".into(), json!(true)));
+        s.js_substring_matchers
+            .push(("diagnostics-ping-ms".into(), json!(true)));
+        s.js_substring_matchers
+            .push(("runtime-metrics-table".into(), json!(true)));
+        s.js_substring_matchers
+            .push(("daemon-log-pre".into(), json!(true)));
+        s.js_substring_matchers
+            .push(("window.location.reload".into(), json!("r")));
+    }
+    let mut tape = make_tape_with_state("observability", out.clone(), state).await;
+    let cfg = observability::Config {
+        runtime_name: "docker-linux-arm64".into(),
+    };
+    let passed = observability::run(&mut tape, &cfg).await.unwrap();
+    assert!(passed, "happy path should pass");
+
+    let summary: ResultSummary =
+        serde_json::from_str(&std::fs::read_to_string(out.join("result.json")).unwrap()).unwrap();
+    let names: Vec<_> = summary.assertions.iter().map(|a| a.name.as_str()).collect();
+    assert!(names.contains(&"remote_connected"));
+    assert!(names.contains(&"diagnostics_card"));
+    assert!(names.contains(&"ping_rtt_shown"));
+    assert!(names.contains(&"metrics_table"));
+    assert!(names.contains(&"metrics_have_rows"));
+    assert!(names.contains(&"copy_toast"));
+    assert!(names.contains(&"daemon_log_pre"));
+    assert!(names.contains(&"daemon_log_has_lines"));
+}
+
+// ── add-remote-wizard ───────────────────────────────────────────────────
+
+#[tokio::test]
+async fn add_remote_wizard_happy_path_drives_inputs_and_toggles() {
+    let dir = tempdir().unwrap();
+    let out = dir.path().join("add-remote-wizard");
+    let state = Arc::new(Mutex::new(MockState::default()));
+    {
+        let mut s = state.lock().unwrap();
+        // Most-specific readouts FIRST.
+        s.js_substring_matchers.push((
+            "innerText.replace".into(),
+            json!("Hostname: 127.0.0.1 · Port: 2223 · Identity: ~/.ssh/id_e2e"),
+        ));
+        s.js_substring_matchers
+            .push((".checked".into(), json!(true)));
+        s.js_substring_matchers
+            .push(("ssh-identities-row".into(), json!(3)));
+        s.js_substring_matchers
+            .push(("HTMLInputElement.prototype".into(), json!("ok")));
+        s.js_substring_matchers
+            .push(("helmor:open-settings".into(), json!("ok")));
+        s.js_substring_matchers
+            .push((".click(); return true;".into(), json!(true)));
+        s.js_substring_matchers
+            .push(("[role=dialog]".into(), json!(true)));
+        s.js_substring_matchers
+            .push(("add-remote-server-wizard".into(), json!(true)));
+        s.js_substring_matchers
+            .push(("ssh-diagnostics".into(), json!(true)));
+        s.js_substring_matchers
+            .push(("add-remote-server-host-detail".into(), json!(true)));
+        s.js_substring_matchers
+            .push(("window.location.reload".into(), json!("r")));
+    }
+    let mut tape = make_tape_with_state("add-remote-wizard", out.clone(), state).await;
+    let cfg = add_remote_wizard::Config {
+        host_alias: "helmor-taper-arm64".into(),
+    };
+    let passed = add_remote_wizard::run(&mut tape, &cfg).await.unwrap();
+    assert!(passed, "happy path should pass");
+
+    let summary: ResultSummary =
+        serde_json::from_str(&std::fs::read_to_string(out.join("result.json")).unwrap()).unwrap();
+    let names: Vec<_> = summary.assertions.iter().map(|a| a.name.as_str()).collect();
+    assert!(names.contains(&"panel_opens"));
+    assert!(names.contains(&"wizard_opens"));
+    assert!(names.contains(&"ssh_diagnostics_present"));
+    assert!(names.contains(&"identities_listed"));
+    assert!(names.contains(&"host_detail_preview"));
+    assert!(names.contains(&"forward_agent_toggled"));
+    let raw: Value =
+        serde_json::from_str(&std::fs::read_to_string(out.join("result.json")).unwrap()).unwrap();
+    assert_eq!(raw["hostAlias"], "helmor-taper-arm64");
+    assert_eq!(raw["identityRows"], 3);
 }
 
 #[tokio::test]
