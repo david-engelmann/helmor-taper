@@ -20,6 +20,7 @@ pub mod remote_agent;
 pub mod remote_port_forward;
 pub mod remote_terminal;
 pub mod remote_watch;
+pub mod setup_remote_workspace;
 
 use std::process::Command;
 

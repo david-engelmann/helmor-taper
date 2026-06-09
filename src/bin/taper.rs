@@ -22,7 +22,7 @@ use std::process::ExitCode;
 
 use helmor_taper::probes::{
     bundle_install, daemon_persistence, feature_probe, remote_agent, remote_port_forward,
-    remote_terminal, remote_watch,
+    remote_terminal, remote_watch, setup_remote_workspace,
 };
 use helmor_taper::scenarios::{
     add_remote_wizard, agent_on_remote, chat_real_on_remote, connect_over_ssh, end_to_end_demo,
@@ -98,6 +98,7 @@ fn print_usage(prog: &str) {
     eprintln!("  remote-terminal     PTY hosted on container (whoami/hostname/pwd)");
     eprintln!("  remote-watch        Filesystem watcher fires WorkspaceFilesChanged");
     eprintln!("  feature-probe       Sweep of 19+ feature surfaces, JSON report");
+    eprintln!("  setup-remote-workspace  One-shot env setup: repo + workspace + clone to remote");
 }
 
 async fn dispatch(subcommand: &str, rest: &[String]) -> anyhow::Result<()> {
@@ -133,8 +134,12 @@ async fn run_probe(rest: &[String]) -> anyhow::Result<()> {
         }
         "remote-watch" => remote_watch::run(&bridge, &remote_watch::Config::from_env()).await?,
         "feature-probe" => feature_probe::run(&bridge, &feature_probe::Config::from_env()).await?,
+        "setup-remote-workspace" => {
+            setup_remote_workspace::run(&bridge, &setup_remote_workspace::Config::from_env())
+                .await?
+        }
         other => anyhow::bail!(
-            "unknown probe: {other}. Available: bundle-install, daemon-persistence, remote-agent, remote-port-forward, remote-terminal, remote-watch, feature-probe"
+            "unknown probe: {other}. Available: bundle-install, daemon-persistence, remote-agent, remote-port-forward, remote-terminal, remote-watch, feature-probe, setup-remote-workspace"
         ),
     };
     if !passed {
