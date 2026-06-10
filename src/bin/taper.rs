@@ -74,6 +74,7 @@ fn print_usage(prog: &str) {
     eprintln!("  eval '<js>'         Run JS in the main window, print JSON result");
     eprintln!("  windows             Dump list_windows JSON");
     eprintln!("  scenario <name>     Run a Rust-ported scenario by name");
+    eprintln!("  smoke-record [secs] Self-contained recording smoke test (default 3s)");
     eprintln!();
     eprintln!("Scenarios:");
     eprintln!("  connect-over-ssh    SSH connect → daemon health → connected row");
@@ -105,9 +106,79 @@ async fn dispatch(subcommand: &str, rest: &[String]) -> anyhow::Result<()> {
     match subcommand {
         "scenario" => run_scenario(rest).await,
         "probe" => run_probe(rest).await,
+        "smoke-record" => run_smoke_record(rest).await,
         "ping" | "windows" | "eval" => run_bridge_command(subcommand, rest).await,
         other => anyhow::bail!("unknown subcommand: {other}"),
     }
+}
+
+/// Tiny self-contained recording smoke test: exercise the
+/// `ScreenCaptureKitRecorder` → `PostProcessing` → `result.json`
+/// chain for a brief recording. Doesn't need a Helmor desktop or
+/// LM Studio — just permission to record the screen.
+///
+/// `taper smoke-record [seconds]`  (default: 3)
+async fn run_smoke_record(rest: &[String]) -> anyhow::Result<()> {
+    use helmor_taper::{convert_mov_to_mp4, convert_mp4_to_gif, Recorder, ScreenCaptureKitRecorder};
+
+    let duration_secs: u64 = rest
+        .first()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(3);
+    let scripts_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("scripts");
+    let out_dir = std::env::var("TAPE_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| PathBuf::from("./tapes/smoke-record"));
+    std::fs::create_dir_all(&out_dir)?;
+    let mov = out_dir.join("smoke.mov");
+    let mp4 = out_dir.join("smoke.mp4");
+    let gif = out_dir.join("smoke.gif");
+    eprintln!("smoke-record: {}s → {}", duration_secs, out_dir.display());
+
+    let mut recorder = ScreenCaptureKitRecorder::new(scripts_dir.join("record-window.swift"));
+    let started = std::time::Instant::now();
+    recorder.start(&mov, std::time::Duration::from_secs(duration_secs))?;
+    eprintln!("  recorder spawned, waiting...");
+    recorder.wait_for_finish()?;
+    let recorded_at = started.elapsed();
+    let mov_size = std::fs::metadata(&mov)?.len();
+    eprintln!(
+        "  recording done in {:.1}s — {} ({} bytes)",
+        recorded_at.as_secs_f64(),
+        mov.display(),
+        mov_size
+    );
+    if mov_size == 0 {
+        anyhow::bail!("recorder wrote 0 bytes — Screen Recording permission?");
+    }
+
+    eprintln!("  remuxing mov → mp4");
+    convert_mov_to_mp4(
+        &PathBuf::from("swift"),
+        &scripts_dir.join("mov-to-mp4.swift"),
+        &mov,
+        &mp4,
+    )?;
+    let mp4_size = std::fs::metadata(&mp4)?.len();
+    eprintln!("  mp4: {} ({} bytes)", mp4.display(), mp4_size);
+
+    eprintln!("  converting mp4 → gif (fps=5 maxWidth=720)");
+    convert_mp4_to_gif(
+        &PathBuf::from("swift"),
+        &scripts_dir.join("mp4-to-gif.swift"),
+        &mp4,
+        &gif,
+        5,
+        720,
+    )?;
+    let gif_size = std::fs::metadata(&gif)?.len();
+    eprintln!("  gif: {} ({} bytes)", gif.display(), gif_size);
+
+    eprintln!("\nsmoke-record OK:");
+    eprintln!("  {} ({} bytes)", mov.display(), mov_size);
+    eprintln!("  {} ({} bytes)", mp4.display(), mp4_size);
+    eprintln!("  {} ({} bytes)", gif.display(), gif_size);
+    Ok(())
 }
 
 async fn run_probe(rest: &[String]) -> anyhow::Result<()> {
