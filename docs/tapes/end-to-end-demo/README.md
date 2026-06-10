@@ -1,7 +1,7 @@
 # end-to-end-demo
 
 THE demo. One tape, walks a reviewer through the full user journey
-for the remote-runner feature in ~2.5 minutes without reading any
+for the remote-runner feature in ~1.8 minutes without reading any
 code.
 
 The pre-recording teardown is aggressive: wipes the container's
@@ -16,6 +16,13 @@ is left in a healthy connected state.
 The composer's model picker shows `google/gemma-4-26b-a4b` — the
 LM Studio bridge — during the chat beats.
 
+**Post-trimmed:** the raw `master.mov` is ~237 s end-to-end; the
+committed `master.mp4` / `master.gif` are ffmpeg-trimmed to ~109 s
+by cutting two long LM Studio response windows (roughly 36 s + 47 s
+of "Working…" indicator) without losing any visible action — both
+"sent" frames and the assistant's text-block reply land in-frame.
+Wall time below is the trimmed playback time.
+
 ## What the tape captures (continuous mode, no burned captions)
 
 | Wall time | Beat | What's on screen |
@@ -25,11 +32,11 @@ LM Studio bridge — during the chat beats.
 | 0:13–0:23 | **3. Install lands** | Chip flips green: `Agent runtime installed in N.Ns · ready to run agents on the container`. Everything in `$HOME/.helmor/server/`. No sudo. |
 | 0:23–0:29 | **5. Workspace bound to remote** | Close the dialog; workspace `hamal` is selected with the blue runtime chip in the header. |
 | 0:29–0:42 | **6. File tree from the container** | Open Runtime Debug → Workspace inspector probe → `Run file tree`. The result lists files from `/home/e2e/helmor-workspaces/helmor-taper` on the container, including `REMOTE_ONLY_MARKER.txt` (planted via `docker exec` pre-recording). |
-| 0:42–1:45 | **7+8a. Real chat: "list the files"** | The composer goes from empty to a real user prompt. `Thought → text block lists files inline including REMOTE_ONLY_MARKER.txt`. Chat-driven proof of remote execution. |
-| 1:45–2:08 | **8b. Isolation: "hostname?"** | The agent runs `hostname`. Whether the response lands within the recording window is timing-dependent (LM Studio gemma-4-26b-a4b takes 30–60 s per turn under heavy back-to-back load). The prompt firing + `Working...` indicator are visible regardless; the response may complete after the recording cuts. |
-| 2:08–2:17 | **9. All green** | "All ops route to the container. Your laptop is just the viewport." |
-| 2:17–2:23 | **10. docker stop → Degraded banner** | The container is stopped externally; the desktop's liveness ping fails; the top of the window shows `Degraded · docker-linux-arm64 / ping timed out after 3s / Reconnect now`. |
-| 2:23–2:30 | **11. docker start + Reconnect → green** | Container started again, Reconnect button clicked, runtime returns to Connected. Same daemon, same workspace. |
+| 0:42–0:57 | **7+8a. Real chat: "list the files"** | The composer goes from empty to a real user prompt. `Thought → text block lists files inline including REMOTE_ONLY_MARKER.txt`. Chat-driven proof of remote execution. *(LM Studio wait trimmed: ~36 s of "Working…" cut between prompt send and response arrival.)* |
+| 0:57–1:13 | **8b. Isolation: "hostname?"** | The agent runs `hostname`. Response shows the container's randomized hostname (`081e3cab7eb5`), NOT the laptop's. The chat panel displays both prompts + both replies. *(LM Studio wait trimmed: ~47 s cut.)* |
+| 1:13–1:25 | **9. All green** | "All ops route to the container. Your laptop is just the viewport." |
+| 1:25–1:38 | **10. docker stop → Degraded banner** | The container is stopped externally; the desktop's liveness ping fails; the top of the window shows `Degraded · docker-linux-arm64 / connection to ssh://helmor-taper-arm64 closed: peer closed connection cleanly (EOF) / Reconnect now`. |
+| 1:38–1:49 | **11. docker start + Reconnect → green** | Container started again, Reconnect button clicked, runtime returns to Connected. Same daemon, same workspace, same sessions. |
 
 ## Assertions in `result.json`
 

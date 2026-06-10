@@ -1,6 +1,6 @@
 {
   "scenario": "end-to-end-demo",
-  "startedAt": "2026-06-10T14:18:29.038Z",
+  "startedAt": "2026-06-10T15:24:10.288Z",
   "passed": true,
   "assertions": [
     {
@@ -54,59 +54,59 @@
   ],
   "beats": [
     {
-      "t": 1.502309,
+      "t": 1.501305667,
       "caption": "Helmor — connected to docker-linux-arm64, no agent runtime yet"
     },
     {
-      "t": 6.512771208,
+      "t": 6.524694959,
       "caption": "Reinstall → sha256-verified tar-stream over SSH, atomic per-file"
     },
     {
-      "t": 13.515796916,
+      "t": 13.528317167,
       "caption": "Everything lands in $HOME/.helmor/server/ — no sudo, no shell rc edits"
     },
     {
-      "t": 18.519735583,
-      "caption": "Agent runtime installed in 5.0s · ready to run agents on the container"
+      "t": 18.544048917,
+      "caption": "Agent runtime installed in 5.4s · ready to run agents on the container"
     },
     {
-      "t": 24.146000875,
+      "t": 24.160355042,
       "caption": "Workspace bound to docker-linux-arm64 — the blue chip says \"files live in the container\""
     },
     {
-      "t": 30.465773458,
+      "t": 30.45241625,
       "caption": "File tree → entries come from /home/e2e/helmor-workspaces/helmor-taper on the container"
     },
     {
-      "t": 36.472203916,
+      "t": 36.470436334,
       "caption": "Planted a file via docker exec → Run changes lists it. Proof: container, not laptop."
     },
     {
-      "t": 106.318572,
+      "t": 83.930831042,
       "caption": "Chat: \"list the files\" → agent ran `ls -1` inside the container; REMOTE_ONLY_MARKER.txt came back."
     },
     {
-      "t": 176.557549916,
+      "t": 144.771706875,
       "caption": "Chat: \"hostname?\" → 081e3cab7eb5. The laptop is just the viewport."
     },
     {
-      "t": 185.061200708,
+      "t": 153.27669775,
       "caption": "All ops route to the container. Your laptop is just the viewport."
     },
     {
-      "t": 193.607179625,
+      "t": 161.7255685,
       "caption": "docker stop → liveness ping fails → banner flips to Degraded"
     },
     {
-      "t": 204.399608958,
+      "t": 172.921469584,
       "caption": "docker start → Reconnect → green. Same daemon, same workspace, same sessions."
     },
     {
-      "t": 210.708419583,
+      "t": 179.117743417,
       "caption": "Everything Helmor wrote is in $HOME/.helmor/server/. Uninstall = rm -rf that one dir."
     }
   ],
-  "chipText": "Agent runtime installed in 5.0s",
+  "chipText": "Agent runtime installed in 5.4s",
   "remotePath": "/home/e2e/helmor-workspaces/helmor-taper",
   "runtimeName": "docker-linux-arm64",
   "workspaceId": "305321b9-ed24-472d-80e3-247c61450d7d"
