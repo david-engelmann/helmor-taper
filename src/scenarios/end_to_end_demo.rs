@@ -317,7 +317,12 @@ pub async fn run(tape: &mut Tape, config: &Config) -> Result<bool> {
     tape.assert("row_present", row_present, "");
 
     // Start recording (140 s = ~8 beats + headroom).
-    tape.start_recording(140, 8, 960).await?;
+    // Recording budget needs to cover the full beat timeline through
+    // the docker-stop/start chaos beats at the end. Prior run's beats
+    // landed up to t≈211s; 240s gives 30s headroom for LM Studio
+    // variance without risking a cut-off of the headline isolation +
+    // resilience beats.
+    tape.start_recording(240, 8, 960).await?;
 
     // ── Beat 1 — connected baseline ───────────────────────────────
     tape.scene(
