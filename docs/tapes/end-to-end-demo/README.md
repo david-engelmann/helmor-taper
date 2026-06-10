@@ -33,14 +33,22 @@ LM Studio bridge — during the chat beats.
 
 ## Assertions in `result.json`
 
-Most pass; the hostname beat (`chat_hostname_arrived` /
-`hostname_tool_result_is_container`) may fail when the LM Studio
-response runs past the recording's deadline. The headline assertions
-covering install + file ops + ls + banner all pass.
+All 11 assertions passed in the current recording (committed
+2026-06-10 — first recording produced by the Rust `taper` binary
+after the TS→Rust migration). The hostname beat (`chat_hostname_arrived`
+/ `hostname_tool_result_is_container`) lands cleanly in-frame:
+container hostname `081e3cab7eb5` shows up in the persisted tool
+result; the laptop's hostname is absent. Result: 11/11 ok, 13
+beats, scenario passed=true.
 
-For a hostname-focused proof, see the `isolation-proof` tape — that
-one's recording window is sized for three sequential LM Studio
-turns and consistently lands the hostname response in-frame.
+For a hostname-focused proof variant, see the `isolation-proof`
+tape — three sequential LM Studio turns each pinning what the
+agent can and cannot see.
+
+This tape was recorded with the Rust port (`taper scenario
+end-to-end-demo`). Earlier copies of this same scenario produced
+by the (now-retired) TypeScript implementation are in git history;
+result.json shape is byte-for-byte identical.
 
 ## Why no burned captions
 
