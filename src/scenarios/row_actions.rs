@@ -42,7 +42,8 @@ pub struct ActionButtons {
 pub async fn run(tape: &mut Tape, config: &Config) -> Result<bool> {
     let row_selector = format!("[data-testid=remote-server-row-{}]", config.runtime_name);
 
-    tape.js::<Value>(r#"window.location.reload(); return "r";"#).await?;
+    tape.js::<Value>(r#"window.location.reload(); return "r";"#)
+        .await?;
     tape.sleep(Duration::from_secs(6)).await;
     tape.open_settings("remote-servers").await?;
     let panel_opens = tape
@@ -112,10 +113,7 @@ pub async fn run(tape: &mut Tape, config: &Config) -> Result<bool> {
     ))
     .await?;
     let auth_dialog = tape
-        .wait_for(
-            "[data-testid=runtime-auth-dialog]",
-            Duration::from_secs(5),
-        )
+        .wait_for("[data-testid=runtime-auth-dialog]", Duration::from_secs(5))
         .await?;
     tape.assert("auth_dialog_opens", auth_dialog, "");
     let auth_status: String = tape

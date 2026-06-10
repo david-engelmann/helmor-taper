@@ -45,8 +45,7 @@ impl Config {
         Self {
             runtime_name: std::env::var("RUNTIME_NAME")
                 .unwrap_or_else(|_| "docker-linux-arm64".into()),
-            host_alias: std::env::var("HOST_ALIAS")
-                .unwrap_or_else(|_| "helmor-taper-arm64".into()),
+            host_alias: std::env::var("HOST_ALIAS").unwrap_or_else(|_| "helmor-taper-arm64".into()),
             remote_binary: std::env::var("REMOTE_BINARY")
                 .unwrap_or_else(|_| "/home/e2e/.helmor/server/helmor-server".into()),
             container: std::env::var("CONTAINER")
@@ -243,7 +242,15 @@ pub async fn run(tape: &mut Tape, config: &Config) -> Result<bool> {
                        fi";
     run_cmd(
         "docker",
-        &["exec", "-u", "e2e", &config.container, "sh", "-c", wipe_bundle],
+        &[
+            "exec",
+            "-u",
+            "e2e",
+            &config.container,
+            "sh",
+            "-c",
+            wipe_bundle,
+        ],
     )?;
     tape.log("wiped container bundle artifacts");
 
@@ -255,7 +262,15 @@ pub async fn run(tape: &mut Tape, config: &Config) -> Result<bool> {
     );
     run_cmd(
         "docker",
-        &["exec", "-u", "e2e", &config.container, "sh", "-c", &plant_cmd],
+        &[
+            "exec",
+            "-u",
+            "e2e",
+            &config.container,
+            "sh",
+            "-c",
+            &plant_cmd,
+        ],
     )?;
     tape.log(&format!("planted {MARKER} on container"));
 
@@ -287,7 +302,8 @@ pub async fn run(tape: &mut Tape, config: &Config) -> Result<bool> {
     ));
 
     // Reload + open Remote Servers panel.
-    tape.js::<Value>(r#"window.location.reload(); return "r";"#).await?;
+    tape.js::<Value>(r#"window.location.reload(); return "r";"#)
+        .await?;
     tape.sleep(Duration::from_secs(6)).await;
     tape.open_settings("remote-servers").await?;
     let panel_open = tape
@@ -447,9 +463,7 @@ pub async fn run(tape: &mut Tape, config: &Config) -> Result<bool> {
     let deadline = Instant::now() + Duration::from_secs(15);
     while Instant::now() < deadline {
         hook_ready = tape
-            .js::<bool>(
-                r#"return typeof window.__helmorTest?.sendPrompt === "function";"#,
-            )
+            .js::<bool>(r#"return typeof window.__helmorTest?.sendPrompt === "function";"#)
             .await?;
         if hook_ready {
             break;
@@ -544,9 +558,7 @@ pub async fn run(tape: &mut Tape, config: &Config) -> Result<bool> {
         "[data-testid=remote-connection-banner-row-{}]",
         config.runtime_name
     );
-    let banner_visible = tape
-        .wait_for(&banner_sel, Duration::from_secs(10))
-        .await?;
+    let banner_visible = tape.wait_for(&banner_sel, Duration::from_secs(10)).await?;
     tape.assert("banner_visible", banner_visible, "");
     tape.scene(
         SceneSpec::new("docker stop → liveness ping fails → banner flips to Degraded").hold_sec(6),
@@ -581,15 +593,18 @@ pub async fn run(tape: &mut Tape, config: &Config) -> Result<bool> {
     )
     .await?;
     tape.scene(
-        SceneSpec::new("docker start → Reconnect → green. Same daemon, same workspace, same sessions.")
-            .record_sec(3)
-            .hold_sec(6),
+        SceneSpec::new(
+            "docker start → Reconnect → green. Same daemon, same workspace, same sessions.",
+        )
+        .record_sec(3)
+        .hold_sec(6),
     )
     .await?;
 
     // ── Beat 13 — close out ───────────────────────────────────────
     tape.open_settings("remote-servers").await?;
-    tape.wait_for(&row_selector, Duration::from_secs(10)).await?;
+    tape.wait_for(&row_selector, Duration::from_secs(10))
+        .await?;
     tape.scene(
         SceneSpec::new(
             "Everything Helmor wrote is in $HOME/.helmor/server/. Uninstall = rm -rf that one dir.",

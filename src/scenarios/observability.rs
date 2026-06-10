@@ -47,9 +47,7 @@ pub struct RuntimeState {
 
 pub async fn run(tape: &mut Tape, config: &Config) -> Result<bool> {
     let runtimes: Vec<RuntimeEntry> = tape.invoke("list_remote_runtimes", json!({})).await?;
-    let remote = runtimes
-        .iter()
-        .find(|r| r.name == config.runtime_name);
+    let remote = runtimes.iter().find(|r| r.name == config.runtime_name);
     let state_label = remote
         .and_then(|r| r.state.as_ref())
         .and_then(|s| s.kind.as_deref())
@@ -60,7 +58,8 @@ pub async fn run(tape: &mut Tape, config: &Config) -> Result<bool> {
         format!("{}={state_label}", config.runtime_name),
     );
 
-    tape.js::<Value>(r#"window.location.reload(); return "r";"#).await?;
+    tape.js::<Value>(r#"window.location.reload(); return "r";"#)
+        .await?;
     tape.sleep(Duration::from_secs(6)).await;
     tape.open_settings("runtime-debug").await?;
     let panel_opens = tape
@@ -77,10 +76,7 @@ pub async fn run(tape: &mut Tape, config: &Config) -> Result<bool> {
         .await?;
     tape.assert("diagnostics_card", diagnostics_card, "");
     let ping_rtt = tape
-        .wait_for(
-            "[data-testid=diagnostics-ping-ms]",
-            Duration::from_secs(8),
-        )
+        .wait_for("[data-testid=diagnostics-ping-ms]", Duration::from_secs(8))
         .await?;
     tape.assert("ping_rtt_shown", ping_rtt, "");
     tape.scroll_to_section("[data-testid=connection-diagnostics-card]")
@@ -160,10 +156,7 @@ pub async fn run(tape: &mut Tape, config: &Config) -> Result<bool> {
 
     // Daemon log tail.
     let daemon_log_pre = tape
-        .wait_for(
-            "[data-testid=daemon-log-pre]",
-            Duration::from_secs(10),
-        )
+        .wait_for("[data-testid=daemon-log-pre]", Duration::from_secs(10))
         .await?;
     tape.assert("daemon_log_pre", daemon_log_pre, "");
     tape.scroll_to_section("[data-testid=daemon-log-runtime-select]")

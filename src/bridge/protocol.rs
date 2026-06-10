@@ -179,7 +179,9 @@ mod tests {
     fn into_result_returns_command_error_on_failure() {
         let r = BridgeResponse::err("id-5", "no such command");
         let err = r.into_result().expect_err("failure variant should error");
-        assert!(matches!(err, BridgeError::Command { ref message } if message == "no such command"));
+        assert!(
+            matches!(err, BridgeError::Command { ref message } if message == "no such command")
+        );
     }
 
     #[test]
@@ -208,10 +210,16 @@ mod tests {
         // serialized as absent, not as null.
         let r = BridgeResponse::ok("id-7", json!("hi"));
         let wire = serde_json::to_string(&r).unwrap();
-        assert!(!wire.contains("error"), "ok response must not emit error field: {wire}");
+        assert!(
+            !wire.contains("error"),
+            "ok response must not emit error field: {wire}"
+        );
 
         let r = BridgeResponse::err("id-8", "boom");
         let wire = serde_json::to_string(&r).unwrap();
-        assert!(!wire.contains("\"data\""), "err response must not emit data field: {wire}");
+        assert!(
+            !wire.contains("\"data\""),
+            "err response must not emit data field: {wire}"
+        );
     }
 }

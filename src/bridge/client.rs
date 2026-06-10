@@ -71,9 +71,7 @@ pub enum ConnectError {
 
 type PendingMap = Arc<Mutex<HashMap<String, oneshot::Sender<BridgeResponse>>>>;
 type WsWriter = Arc<
-    Mutex<
-        futures_util::stream::SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, Message>,
-    >,
+    Mutex<futures_util::stream::SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, Message>>,
 >;
 
 /// Public handle. Cloneable — both clones share the same connection

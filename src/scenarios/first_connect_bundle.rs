@@ -28,8 +28,7 @@ impl Config {
         Self {
             runtime_name: std::env::var("RUNTIME_NAME")
                 .unwrap_or_else(|_| "docker-linux-arm64".into()),
-            host_alias: std::env::var("HOST_ALIAS")
-                .unwrap_or_else(|_| "helmor-taper-arm64".into()),
+            host_alias: std::env::var("HOST_ALIAS").unwrap_or_else(|_| "helmor-taper-arm64".into()),
             container: std::env::var("CONTAINER")
                 .unwrap_or_else(|_| "helmor-test-linux-arm64".into()),
             remote_binary: std::env::var("REMOTE_BINARY")
@@ -64,7 +63,8 @@ pub async fn run(tape: &mut Tape, config: &Config) -> Result<bool> {
     wipe_container_bundle(&config.container)?;
     tape.log("wiped container bundle artifacts");
 
-    tape.js::<Value>(r#"window.location.reload(); return "r";"#).await?;
+    tape.js::<Value>(r#"window.location.reload(); return "r";"#)
+        .await?;
     tape.sleep(Duration::from_secs(6)).await;
     tape.open_settings("remote-servers").await?;
     let panel_opens = tape
@@ -108,9 +108,11 @@ pub async fn run(tape: &mut Tape, config: &Config) -> Result<bool> {
     tape.assert("bundle_chip_installing", installing_chip, "");
 
     tape.scene(
-        SceneSpec::new("Auto-install: agent runtime streams to the container, sha-verified, atomic per file")
-            .record_sec(4)
-            .hold_sec(6),
+        SceneSpec::new(
+            "Auto-install: agent runtime streams to the container, sha-verified, atomic per file",
+        )
+        .record_sec(4)
+        .hold_sec(6),
     )
     .await?;
 

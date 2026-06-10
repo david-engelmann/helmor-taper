@@ -29,9 +29,7 @@ use helmor_taper::scenarios::{
     first_connect_bundle, isolation_proof, observability, remote_file_ops, remote_runner,
     remote_workspace, resilience, row_actions,
 };
-use helmor_taper::{
-    Bridge, BridgeConfig, PostProcessing, ScreenCaptureKitRecorder, TapeBuilder,
-};
+use helmor_taper::{Bridge, BridgeConfig, PostProcessing, ScreenCaptureKitRecorder, TapeBuilder};
 use serde_json::json;
 
 fn main() -> ExitCode {
@@ -119,12 +117,11 @@ async fn dispatch(subcommand: &str, rest: &[String]) -> anyhow::Result<()> {
 ///
 /// `taper smoke-record [seconds]`  (default: 3)
 async fn run_smoke_record(rest: &[String]) -> anyhow::Result<()> {
-    use helmor_taper::{convert_mov_to_mp4, convert_mp4_to_gif, Recorder, ScreenCaptureKitRecorder};
+    use helmor_taper::{
+        convert_mov_to_mp4, convert_mp4_to_gif, Recorder, ScreenCaptureKitRecorder,
+    };
 
-    let duration_secs: u64 = rest
-        .first()
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(3);
+    let duration_secs: u64 = rest.first().and_then(|s| s.parse().ok()).unwrap_or(3);
     let scripts_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("scripts");
     let out_dir = std::env::var("TAPE_DIR")
         .map(PathBuf::from)
@@ -228,7 +225,10 @@ async fn run_bridge_command(subcommand: &str, rest: &[String]) -> anyhow::Result
         "ping" => {
             let windows = bridge.request("list_windows", json!({})).await?;
             let count = windows.as_array().map(|a| a.len()).unwrap_or(0);
-            println!("bridge reachable on port {}, {count} window(s)", bridge.port());
+            println!(
+                "bridge reachable on port {}, {count} window(s)",
+                bridge.port()
+            );
             Ok(())
         }
         "windows" => {

@@ -1,0 +1,70 @@
+name: CI
+
+# Build + test + lint on every push to main and every PR.
+#
+# Runs on macOS because the ScreenCaptureKitRecorder + post-processing
+# tests shell out to `swift` (mocked via shell shims in unit tests, so
+# nothing actually records). The shims do require a unix shell that
+# understands `#!/usr/bin/env bash` and `printf`, which is what macOS
+# gives us. Linux runners would also work for the unit tests but the
+# Swift binary the production code shells out to is macOS-only, so
+# pinning macos-latest keeps the test environment and the production
+# target on the same OS.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  # `sccache` shim is on PATH in some self-hosted images and bombs the
+  # build with "could not execute process `sccache`". Clear it.
+  RUSTC_WRAPPER: ""
+
+jobs:
+  test:
+    name: Build + test + lint
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Read pinned Rust channel from rust-toolchain.toml (or default)
+        id: rust_channel
+        shell: bash
+        run: |
+          if [ -f rust-toolchain.toml ]; then
+            channel=$(awk -F '"' '/^channel/{print $2}' rust-toolchain.toml)
+          else
+            channel="stable"
+          fi
+          echo "channel=$channel" >> "$GITHUB_OUTPUT"
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ steps.rust_channel.outputs.channel }}
+          components: clippy, rustfmt
+
+      - name: Cache cargo registry + target
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: helmor-taper-ci
+
+      - name: cargo fmt --check
+        run: cargo fmt --all -- --check
+
+      - name: cargo clippy --all-targets -D warnings
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: cargo test
+        run: cargo test --all-targets

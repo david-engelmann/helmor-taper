@@ -75,10 +75,8 @@ pub async fn run(tape: &mut Tape, config: &Config) -> Result<bool> {
         .wait_for("[data-testid=remote-servers-empty]", Duration::from_secs(3))
         .await?;
     tape.assert("starts_empty", starts_empty, "no remote servers yet");
-    tape.scene(
-        SceneSpec::new("Settings → Remote Servers: empty until we connect one").hold_sec(4),
-    )
-    .await?;
+    tape.scene(SceneSpec::new("Settings → Remote Servers: empty until we connect one").hold_sec(4))
+        .await?;
 
     // Scene 2: SSH connect.
     tape.close_dialog().await?;

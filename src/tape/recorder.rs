@@ -51,7 +51,9 @@ pub struct NullRecorder {
 impl Recorder for NullRecorder {
     fn start(&mut self, out_path: &Path, duration: Duration) -> Result<(), RecorderError> {
         if let Some((path, _)) = self.starts.last() {
-            return Err(RecorderError::AlreadyStarted { started: path.clone() });
+            return Err(RecorderError::AlreadyStarted {
+                started: path.clone(),
+            });
         }
         self.starts.push((out_path.to_path_buf(), duration));
         Ok(())

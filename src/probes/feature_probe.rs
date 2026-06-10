@@ -94,9 +94,8 @@ pub async fn run(bridge: &Bridge, config: &Config) -> Result<bool> {
     let mut results: Vec<Check> = Vec::new();
 
     // Discover bound workspace.
-    let bindings: Vec<WorkspaceBinding> = serde_json::from_value(
-        inv(bridge, "list_workspace_runtime_bindings", json!({})).await?,
-    )?;
+    let bindings: Vec<WorkspaceBinding> =
+        serde_json::from_value(inv(bridge, "list_workspace_runtime_bindings", json!({})).await?)?;
     let bound = bindings
         .iter()
         .find(|b| b.runtime_name == config.runtime_name)
@@ -116,12 +115,16 @@ pub async fn run(bridge: &Bridge, config: &Config) -> Result<bool> {
         Ok(format!("{} hosts incl. {}", hosts.len(), config.host_alias))
     }
     .await;
-    record(&mut results, "SSH host autocomplete (~/.ssh/config)", "B", res);
+    record(
+        &mut results,
+        "SSH host autocomplete (~/.ssh/config)",
+        "B",
+        res,
+    );
 
     let res = async {
-        let details: Vec<Value> = serde_json::from_value(
-            inv(bridge, "list_ssh_host_details", json!({})).await?,
-        )?;
+        let details: Vec<Value> =
+            serde_json::from_value(inv(bridge, "list_ssh_host_details", json!({})).await?)?;
         let d = details
             .iter()
             .find(|d| d.get("alias").and_then(Value::as_str) == Some(&config.host_alias))
@@ -200,7 +203,10 @@ pub async fn run(bridge: &Bridge, config: &Config) -> Result<bool> {
             json!({"runtimeName": config.runtime_name}),
         )
         .await?;
-        let kind = h.get("kind").and_then(|k| k.get("type")).and_then(Value::as_str);
+        let kind = h
+            .get("kind")
+            .and_then(|k| k.get("type"))
+            .and_then(Value::as_str);
         if kind != Some("remote") {
             return Err(anyhow!("expected remote, got {kind:?}"));
         }
@@ -242,7 +248,10 @@ pub async fn run(bridge: &Bridge, config: &Config) -> Result<bool> {
             json!({"name": config.runtime_name}),
         )
         .await?;
-        let keys: Vec<&str> = m.as_object().map(|o| o.keys().take(6).map(|s| s.as_str()).collect()).unwrap_or_default();
+        let keys: Vec<&str> = m
+            .as_object()
+            .map(|o| o.keys().take(6).map(|s| s.as_str()).collect())
+            .unwrap_or_default();
         Ok(format!("metrics keys: {}", keys.join(",")))
     }
     .await;
@@ -255,7 +264,10 @@ pub async fn run(bridge: &Bridge, config: &Config) -> Result<bool> {
             json!({"name": config.runtime_name}),
         )
         .await?;
-        let keys: Vec<&str> = d.as_object().map(|o| o.keys().take(6).map(|s| s.as_str()).collect()).unwrap_or_default();
+        let keys: Vec<&str> = d
+            .as_object()
+            .map(|o| o.keys().take(6).map(|s| s.as_str()).collect())
+            .unwrap_or_default();
         Ok(format!("diagnostics keys: {}", keys.join(",")))
     }
     .await;
@@ -403,7 +415,11 @@ pub async fn run(bridge: &Bridge, config: &Config) -> Result<bool> {
                 json!({"workspaceDir": config.local_workspace_dir, "workspaceId": ws_id}),
             )
             .await?;
-            let entries = r.get("entries").and_then(Value::as_array).cloned().unwrap_or_default();
+            let entries = r
+                .get("entries")
+                .and_then(Value::as_array)
+                .cloned()
+                .unwrap_or_default();
             let n = entries.len();
             let saw = entries.iter().any(|e| {
                 let name = e.get("name").and_then(Value::as_str).unwrap_or("");
@@ -432,7 +448,11 @@ pub async fn run(bridge: &Bridge, config: &Config) -> Result<bool> {
                 }),
             )
             .await?;
-            let matches = r.get("matches").and_then(Value::as_array).cloned().unwrap_or_default();
+            let matches = r
+                .get("matches")
+                .and_then(Value::as_array)
+                .cloned()
+                .unwrap_or_default();
             if matches.is_empty() {
                 return Err(anyhow!("no matches on remote (README should match)"));
             }

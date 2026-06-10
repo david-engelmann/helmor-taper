@@ -75,10 +75,7 @@ pub struct DaemonKind {
 
 /// Run the scenario. Returns `tape.finish()`'s pass/fail boolean.
 pub async fn run(tape: &mut Tape, config: &Config) -> Result<bool> {
-    let row_selector = format!(
-        "[data-testid=remote-server-row-{}]",
-        config.runtime_name
-    );
+    let row_selector = format!("[data-testid=remote-server-row-{}]", config.runtime_name);
 
     // Clean slate: disconnect + close any dialog.
     let _ = tape
@@ -101,10 +98,8 @@ pub async fn run(tape: &mut Tape, config: &Config) -> Result<bool> {
         .wait_for("[data-testid=remote-servers-empty]", Duration::from_secs(3))
         .await?;
     tape.assert("starts_empty", starts_empty, "");
-    tape.scene(
-        SceneSpec::new("Settings → Remote Servers: no remote hosts yet").hold_sec(4),
-    )
-    .await?;
+    tape.scene(SceneSpec::new("Settings → Remote Servers: no remote hosts yet").hold_sec(4))
+        .await?;
 
     // Scene 2 — fire the SSH connect and capture the connecting beat.
     let start = std::time::Instant::now();
@@ -166,19 +161,13 @@ pub async fn run(tape: &mut Tape, config: &Config) -> Result<bool> {
     );
     let version = health.version.clone().unwrap_or_default();
     let semver_re = regex_like_semver_check(&version);
-    tape.assert(
-        "daemon_reports_version",
-        semver_re,
-        format!("v{version}"),
-    );
+    tape.assert("daemon_reports_version", semver_re, format!("v{version}"));
 
     // Scene 3 — reopen the panel showing the connected row.
     tape.close_dialog().await?;
     tape.sleep(Duration::from_millis(300)).await;
     tape.open_settings("remote-servers").await?;
-    let row_visible = tape
-        .wait_for(&row_selector, Duration::from_secs(8))
-        .await?;
+    let row_visible = tape.wait_for(&row_selector, Duration::from_secs(8)).await?;
     tape.assert("ui_shows_connected_row", row_visible, "");
     let row_script = format!(
         r#"var r=document.querySelector({sel}); return r?r.innerText.replace(/\n+/g," · "):null;"#,

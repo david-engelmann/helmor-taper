@@ -63,7 +63,8 @@ pub async fn run(tape: &mut Tape, config: &Config) -> Result<bool> {
         bound.remote_path
     ));
 
-    tape.js::<Value>(r#"window.location.reload(); return "r";"#).await?;
+    tape.js::<Value>(r#"window.location.reload(); return "r";"#)
+        .await?;
     tape.sleep(Duration::from_secs(6)).await;
     tape.open_settings("runtime-debug").await?;
     let panel_opens = tape
@@ -206,6 +207,9 @@ mod tests {
             "remotePath": "/home/e2e/helmor-workspaces/helmor-taper",
         }]);
         let parsed: Vec<WorkspaceBinding> = serde_json::from_value(v).unwrap();
-        assert_eq!(parsed[0].remote_path, "/home/e2e/helmor-workspaces/helmor-taper");
+        assert_eq!(
+            parsed[0].remote_path,
+            "/home/e2e/helmor-workspaces/helmor-taper"
+        );
     }
 }

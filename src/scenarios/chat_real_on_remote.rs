@@ -35,15 +35,13 @@ impl Config {
         Self {
             runtime_name: std::env::var("RUNTIME_NAME")
                 .unwrap_or_else(|_| "docker-linux-arm64".into()),
-            host_alias: std::env::var("HOST_ALIAS")
-                .unwrap_or_else(|_| "helmor-taper-arm64".into()),
+            host_alias: std::env::var("HOST_ALIAS").unwrap_or_else(|_| "helmor-taper-arm64".into()),
             remote_binary: std::env::var("REMOTE_BINARY")
                 .unwrap_or_else(|_| "/home/e2e/.helmor/server/helmor-server".into()),
             container: std::env::var("CONTAINER")
                 .unwrap_or_else(|_| "helmor-test-linux-arm64".into()),
-            local_workspace_dir: std::env::var("LOCAL_WS_DIR").unwrap_or_else(|_| {
-                "/Users/david/helmor-dev/workspaces/helmor-taper/hamal".into()
-            }),
+            local_workspace_dir: std::env::var("LOCAL_WS_DIR")
+                .unwrap_or_else(|_| "/Users/david/helmor-dev/workspaces/helmor-taper/hamal".into()),
             db_path: std::env::var("HELMOR_DB")
                 .unwrap_or_else(|_| format!("{home}/helmor-dev/helmor.db")),
         }
@@ -229,7 +227,15 @@ pub async fn run(tape: &mut Tape, config: &Config) -> Result<bool> {
     );
     run_cmd(
         "docker",
-        &["exec", "-u", "e2e", &config.container, "sh", "-c", &plant_cmd],
+        &[
+            "exec",
+            "-u",
+            "e2e",
+            &config.container,
+            "sh",
+            "-c",
+            &plant_cmd,
+        ],
     )?;
     tape.log(&format!("planted {MARKER}; cleared any stale {NEW_FILE}"));
 
@@ -246,7 +252,8 @@ pub async fn run(tape: &mut Tape, config: &Config) -> Result<bool> {
     ));
 
     // Reload + select bound workspace + wait for composer hook.
-    tape.js::<Value>(r#"window.location.reload(); return "r";"#).await?;
+    tape.js::<Value>(r#"window.location.reload(); return "r";"#)
+        .await?;
     tape.sleep(Duration::from_secs(6)).await;
     let click_script = format!(
         r#"var el=document.querySelector({body_sel})||document.querySelector({row_sel});
@@ -273,9 +280,7 @@ pub async fn run(tape: &mut Tape, config: &Config) -> Result<bool> {
     let deadline = Instant::now() + Duration::from_secs(15);
     while Instant::now() < deadline {
         hook_ready = tape
-            .js::<bool>(
-                r#"return typeof window.__helmorTest?.sendPrompt === "function";"#,
-            )
+            .js::<bool>(r#"return typeof window.__helmorTest?.sendPrompt === "function";"#)
             .await?;
         if hook_ready {
             break;
@@ -342,7 +347,15 @@ pub async fn run(tape: &mut Tape, config: &Config) -> Result<bool> {
     );
     let body = run_cmd(
         "docker",
-        &["exec", "-u", "e2e", &config.container, "sh", "-c", &check_cmd],
+        &[
+            "exec",
+            "-u",
+            "e2e",
+            &config.container,
+            "sh",
+            "-c",
+            &check_cmd,
+        ],
     )?;
     let exists = body == NEW_FILE_TEXT;
     tape.assert(

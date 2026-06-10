@@ -240,8 +240,7 @@ exit 1
         let shim = make_failing_shim(dir.path());
         let mov_path = dir.path().join("out.mov");
 
-        let mut recorder =
-            ScreenCaptureKitRecorder::new("ignored").with_swift_bin(shim);
+        let mut recorder = ScreenCaptureKitRecorder::new("ignored").with_swift_bin(shim);
         recorder.start(&mov_path, Duration::from_secs(1)).unwrap();
         let err = recorder
             .wait_for_finish()
@@ -266,8 +265,7 @@ exit 1
         let mov_a = dir.path().join("a.mov");
         let mov_b = dir.path().join("b.mov");
 
-        let mut recorder =
-            ScreenCaptureKitRecorder::new("ignored").with_swift_bin(shim);
+        let mut recorder = ScreenCaptureKitRecorder::new("ignored").with_swift_bin(shim);
         recorder.start(&mov_a, Duration::from_secs(1)).unwrap();
         let err = recorder
             .start(&mov_b, Duration::from_secs(1))
@@ -288,8 +286,8 @@ exit 1
     fn missing_swift_binary_surfaces_spawn_error() {
         let dir = tempdir().unwrap();
         let mov = dir.path().join("out.mov");
-        let mut recorder = ScreenCaptureKitRecorder::new("ignored")
-            .with_swift_bin("/nonexistent/path/to/swift");
+        let mut recorder =
+            ScreenCaptureKitRecorder::new("ignored").with_swift_bin("/nonexistent/path/to/swift");
         let err = recorder
             .start(&mov, Duration::from_secs(1))
             .expect_err("missing binary must error");
@@ -323,8 +321,7 @@ sleep 30
 
         let started = std::time::Instant::now();
         {
-            let mut recorder = ScreenCaptureKitRecorder::new("ignored")
-                .with_swift_bin(shim);
+            let mut recorder = ScreenCaptureKitRecorder::new("ignored").with_swift_bin(shim);
             recorder.start(&mov, Duration::from_secs(30)).unwrap();
             // Drop without wait — Drop must reap the child.
         }
@@ -372,7 +369,9 @@ exit 0
             .with_owner("DocTestOwner");
 
         recorder.start(&mov_path, Duration::from_secs(2)).unwrap();
-        recorder.wait_for_finish().expect("arg checker should exit 0");
+        recorder
+            .wait_for_finish()
+            .expect("arg checker should exit 0");
         assert!(recorder.last_stderr.contains("OK DocTestOwner 2"));
     }
 }

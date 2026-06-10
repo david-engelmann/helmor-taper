@@ -80,10 +80,7 @@ pub async fn run(tape: &mut Tape, config: &Config) -> Result<bool> {
         .find(|b| b.runtime_name == config.runtime_name)
         .ok_or_else(|| anyhow!("no workspace bound to {}", config.runtime_name))?;
     let session: CreateSessionResult = tape
-        .invoke(
-            "create_session",
-            json!({"workspaceId": bound.workspace_id}),
-        )
+        .invoke("create_session", json!({"workspaceId": bound.workspace_id}))
         .await?;
     tape.log(&format!(
         "workspace {}… → {}; fresh session {}…",
@@ -93,7 +90,8 @@ pub async fn run(tape: &mut Tape, config: &Config) -> Result<bool> {
     ));
 
     // Open Runtime Debug + scroll to the Remote agent sessions section.
-    tape.js::<Value>(r#"window.location.reload(); return "r";"#).await?;
+    tape.js::<Value>(r#"window.location.reload(); return "r";"#)
+        .await?;
     tape.sleep(Duration::from_secs(6)).await;
     tape.open_settings("runtime-debug").await?;
     let panel_open = tape

@@ -240,10 +240,7 @@ impl Tape {
         let line = if detail.is_empty() {
             format!("{} {name}", if ok { "PASS" } else { "FAIL" })
         } else {
-            format!(
-                "{} {name} — {detail}",
-                if ok { "PASS" } else { "FAIL" }
-            )
+            format!("{} {name} — {detail}", if ok { "PASS" } else { "FAIL" })
         };
         self.log(&line);
         self.assertions.push(Assertion { name, ok, detail });
@@ -265,14 +262,9 @@ impl Tape {
         args: Value,
     ) -> Result<T> {
         let slot = format!("{}-{}", self.name, self.scene_idx);
-        let raw = commands::invoke_and_wait(
-            &self.bridge,
-            cmd,
-            args,
-            Duration::from_secs(90),
-            &slot,
-        )
-        .await?;
+        let raw =
+            commands::invoke_and_wait(&self.bridge, cmd, args, Duration::from_secs(90), &slot)
+                .await?;
         let parsed = serde_json::from_value(raw).context("Tape::invoke failed to parse result")?;
         Ok(parsed)
     }
@@ -453,9 +445,8 @@ impl Tape {
         if self.continuous.is_some() {
             anyhow::bail!("recording already started");
         }
-        std::fs::create_dir_all(&self.out_dir).with_context(|| {
-            format!("failed to create out_dir {}", self.out_dir.display())
-        })?;
+        std::fs::create_dir_all(&self.out_dir)
+            .with_context(|| format!("failed to create out_dir {}", self.out_dir.display()))?;
         let mov_path = self.out_dir.join("master.mov");
 
         {
@@ -530,14 +521,12 @@ impl Tape {
             beats: self.beats.clone(),
             extras,
         };
-        std::fs::create_dir_all(&self.out_dir).with_context(|| {
-            format!("failed to create out_dir {}", self.out_dir.display())
-        })?;
+        std::fs::create_dir_all(&self.out_dir)
+            .with_context(|| format!("failed to create out_dir {}", self.out_dir.display()))?;
         let result_path = self.out_dir.join("result.json");
         let json = serde_json::to_string_pretty(&summary)?;
-        std::fs::write(&result_path, json).with_context(|| {
-            format!("failed to write {}", result_path.display())
-        })?;
+        std::fs::write(&result_path, json)
+            .with_context(|| format!("failed to write {}", result_path.display()))?;
 
         if let Some(state) = self.continuous.take() {
             // Wait for the recorder to finish writing the .mov.
@@ -605,9 +594,7 @@ fn format_iso_utc(secs_since_epoch: u64, millis: u32) -> String {
     let minute = ((tod % 3600) / 60) as u32;
     let second = (tod % 60) as u32;
     let (year, month, day) = civil_from_days(days);
-    format!(
-        "{year:04}-{month:02}-{day:02}T{hour:02}:{minute:02}:{second:02}.{millis:03}Z"
-    )
+    format!("{year:04}-{month:02}-{day:02}T{hour:02}:{minute:02}:{second:02}.{millis:03}Z")
 }
 
 /// Howard Hinnant's "days_from_civil" inverse — given days since
@@ -660,10 +647,7 @@ mod tests {
         assert_eq!(format_iso_utc(0, 0), "1970-01-01T00:00:00.000Z");
         // 2026-06-07T12:34:56.789Z = 1780835696s + 789ms (verified via
         // `python -c "import datetime; print(int(datetime.datetime(2026,6,7,12,34,56,tzinfo=datetime.timezone.utc).timestamp()))"`).
-        assert_eq!(
-            format_iso_utc(1780835696, 789),
-            "2026-06-07T12:34:56.789Z"
-        );
+        assert_eq!(format_iso_utc(1780835696, 789), "2026-06-07T12:34:56.789Z");
     }
 
     #[test]

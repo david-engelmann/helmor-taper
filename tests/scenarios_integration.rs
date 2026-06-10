@@ -86,8 +86,10 @@ async fn spawn_scenario_aware_bridge(state: Arc<Mutex<MockState>>) -> u16 {
                     let command = req["command"].as_str().unwrap_or_default();
 
                     let response_data = if command == "execute_js" {
-                        let script =
-                            req["args"]["script"].as_str().unwrap_or_default().to_string();
+                        let script = req["args"]["script"]
+                            .as_str()
+                            .unwrap_or_default()
+                            .to_string();
                         state.lock().unwrap().seen_scripts.push(script.clone());
                         handle_execute_js(&state, &script)
                     } else {
@@ -116,7 +118,8 @@ fn handle_execute_js(state: &Arc<Mutex<MockState>>, script: &str) -> Value {
             return json!("started");
         }
         // No scripted response — record the slot as "pending forever".
-        s.fired_slots.insert(slot.clone(), ScriptedResponse::ok(Value::Null));
+        s.fired_slots
+            .insert(slot.clone(), ScriptedResponse::ok(Value::Null));
         return json!("started");
     }
     // 2. Poll pattern: script reads `window.__taper[<slot>]`. Return
@@ -232,12 +235,7 @@ async fn connect_over_ssh_happy_path_passes_all_assertions() {
             .push(("remote-server-row-".to_string(), json!(true)));
     }
 
-    let mut tape = make_tape_with_state(
-        "connect-over-ssh",
-        out.clone(),
-        Arc::clone(&state),
-    )
-    .await;
+    let mut tape = make_tape_with_state("connect-over-ssh", out.clone(), Arc::clone(&state)).await;
     let cfg = connect_over_ssh::Config {
         host: "helmor-taper-arm64".into(),
         runtime_name: "docker-linux-arm64".into(),
@@ -449,8 +447,10 @@ async fn observability_happy_path_asserts_diagnostics_metrics_log() {
         );
         // Most-specific readouts FIRST so they win against the
         // wait_for predicates that share the same testid.
-        s.js_substring_matchers
-            .push(("innerText.replace".into(), json!("ping 14ms · transport ok")));
+        s.js_substring_matchers.push((
+            "innerText.replace".into(),
+            json!("ping 14ms · transport ok"),
+        ));
         s.js_substring_matchers
             .push(("querySelectorAll('tr').length".into(), json!(7)));
         s.js_substring_matchers
@@ -695,4 +695,3 @@ async fn end_to_end_demo_config_is_wired() {
     assert_eq!(cfg.runtime_name, "docker-linux-arm64");
     assert_eq!(cfg.host_alias, "helmor-taper-arm64");
 }
-

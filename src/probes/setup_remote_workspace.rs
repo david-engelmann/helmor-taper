@@ -39,9 +39,7 @@ impl Config {
             repo_path: std::env::var("REPO_PATH")
                 .ok()
                 .map(PathBuf::from)
-                .unwrap_or_else(|| {
-                    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                }),
+                .unwrap_or_else(|| PathBuf::from(env!("CARGO_MANIFEST_DIR"))),
             host_alias: std::env::var("HOST_ALIAS").unwrap_or_else(|_| "helmor-taper-arm64".into()),
             runtime_name: std::env::var("RUNTIME_NAME")
                 .unwrap_or_else(|_| "docker-linux-arm64".into()),
@@ -205,7 +203,10 @@ mod tests {
         let c = Config::from_env();
         assert!(c.repo_path.is_absolute());
         assert_eq!(c.host_alias, "helmor-taper-arm64");
-        assert_eq!(c.remote_workspace_path, "/home/e2e/helmor-workspaces/helmor-taper");
+        assert_eq!(
+            c.remote_workspace_path,
+            "/home/e2e/helmor-workspaces/helmor-taper"
+        );
     }
 
     #[test]

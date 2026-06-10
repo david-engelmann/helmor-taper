@@ -42,8 +42,7 @@ impl Config {
         Self {
             runtime_name: std::env::var("RUNTIME_NAME")
                 .unwrap_or_else(|_| "docker-linux-arm64".into()),
-            host_alias: std::env::var("HOST_ALIAS")
-                .unwrap_or_else(|_| "helmor-taper-arm64".into()),
+            host_alias: std::env::var("HOST_ALIAS").unwrap_or_else(|_| "helmor-taper-arm64".into()),
             remote_binary: std::env::var("REMOTE_BINARY")
                 .unwrap_or_else(|_| "/home/e2e/.helmor/server/helmor-server".into()),
             container: std::env::var("CONTAINER")
@@ -58,8 +57,7 @@ const PROMPT_HOSTNAME: &str =
     "Run the shell command `hostname` and reply with only its raw output.";
 const PROMPT_USERS: &str =
     "Run the shell command `[ -e /Users/david ] && echo yes || echo no` and reply with only its output.";
-const PROMPT_PWD: &str =
-    "Run the shell command `pwd` and reply with only the path it prints.";
+const PROMPT_PWD: &str = "Run the shell command `pwd` and reply with only the path it prints.";
 
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default)]
@@ -287,7 +285,8 @@ pub async fn run(tape: &mut Tape, config: &Config) -> Result<bool> {
     ));
 
     // Reload + select workspace + wait for composer hook.
-    tape.js::<Value>(r#"window.location.reload(); return "r";"#).await?;
+    tape.js::<Value>(r#"window.location.reload(); return "r";"#)
+        .await?;
     tape.sleep(Duration::from_secs(6)).await;
     let click_script = format!(
         r#"var el=document.querySelector({body_sel})||document.querySelector({row_sel});
@@ -314,9 +313,7 @@ pub async fn run(tape: &mut Tape, config: &Config) -> Result<bool> {
     let deadline = Instant::now() + Duration::from_secs(15);
     while Instant::now() < deadline {
         hook_ready = tape
-            .js::<bool>(
-                r#"return typeof window.__helmorTest?.sendPrompt === "function";"#,
-            )
+            .js::<bool>(r#"return typeof window.__helmorTest?.sendPrompt === "function";"#)
             .await?;
         if hook_ready {
             break;
@@ -337,8 +334,12 @@ pub async fn run(tape: &mut Tape, config: &Config) -> Result<bool> {
     // Beat 2: hostname.
     let t1 = now_iso();
     send_and_wait(tape, PROMPT_HOSTNAME, "hostname", Duration::from_secs(90)).await?;
-    let saw_container_host =
-        db_contains_recent(&config.db_path, &bound.workspace_id, &container_hostname, &t1)?;
+    let saw_container_host = db_contains_recent(
+        &config.db_path,
+        &bound.workspace_id,
+        &container_hostname,
+        &t1,
+    )?;
     let saw_laptop_host = if laptop_hostname.len() > 3 {
         db_contains_recent(&config.db_path, &bound.workspace_id, &laptop_hostname, &t1)?
     } else {
@@ -362,8 +363,12 @@ pub async fn run(tape: &mut Tape, config: &Config) -> Result<bool> {
     // Beat 3: /Users path absence.
     let t2 = now_iso();
     send_and_wait(tape, PROMPT_USERS, "users_path", Duration::from_secs(90)).await?;
-    let saw_no_tool_result =
-        db_contains_recent(&config.db_path, &bound.workspace_id, r#""content":"no""#, &t2)?;
+    let saw_no_tool_result = db_contains_recent(
+        &config.db_path,
+        &bound.workspace_id,
+        r#""content":"no""#,
+        &t2,
+    )?;
     let saw_no_text_block =
         db_contains_recent(&config.db_path, &bound.workspace_id, r#""text":"no""#, &t2)?;
     let saw_no = saw_no_tool_result || saw_no_text_block;

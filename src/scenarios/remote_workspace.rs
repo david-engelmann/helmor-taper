@@ -61,7 +61,8 @@ pub async fn run(tape: &mut Tape, config: &Config) -> Result<bool> {
     tape.log(&format!("bound workspace: {workspace_id}"));
 
     // Reload to a clean shell, then select the bound workspace.
-    tape.js::<Value>(r#"window.location.reload(); return "r";"#).await?;
+    tape.js::<Value>(r#"window.location.reload(); return "r";"#)
+        .await?;
     tape.sleep(Duration::from_secs(6)).await;
     let row_selector = format!(r#"[data-workspace-row-id="{workspace_id}"]"#);
     let row_present = tape
@@ -72,7 +73,9 @@ pub async fn run(tape: &mut Tape, config: &Config) -> Result<bool> {
     // Click the row body (or the row itself if the body isn't there).
     let click_script = format!(
         r#"var el=document.querySelector({body_sel})||document.querySelector({row_sel}); if(el) el.click(); return "clicked";"#,
-        body_sel = serde_json::to_string(&format!(r#"[data-workspace-row-id="{workspace_id}"] [data-workspace-row-body]"#))?,
+        body_sel = serde_json::to_string(&format!(
+            r#"[data-workspace-row-id="{workspace_id}"] [data-workspace-row-body]"#
+        ))?,
         row_sel = serde_json::to_string(&row_selector)?,
     );
     tape.js::<Value>(&click_script).await?;

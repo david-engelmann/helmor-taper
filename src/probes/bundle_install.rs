@@ -31,8 +31,7 @@ impl Config {
         Self {
             runtime_name: std::env::var("RUNTIME_NAME")
                 .unwrap_or_else(|_| "docker-linux-arm64".into()),
-            host_alias: std::env::var("HOST_ALIAS")
-                .unwrap_or_else(|_| "helmor-taper-arm64".into()),
+            host_alias: std::env::var("HOST_ALIAS").unwrap_or_else(|_| "helmor-taper-arm64".into()),
             remote_binary: std::env::var("REMOTE_BINARY")
                 .unwrap_or_else(|_| "/home/e2e/.helmor/server/helmor-server".into()),
             container: std::env::var("CONTAINER")

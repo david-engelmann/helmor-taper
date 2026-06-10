@@ -79,8 +79,7 @@ where
     let deadline = Instant::now() + timeout;
     let mut last = "(unknown)".to_string();
     while Instant::now() < deadline {
-        let runtimes: Vec<RuntimeEntry> =
-            tape.invoke("list_remote_runtimes", json!({})).await?;
+        let runtimes: Vec<RuntimeEntry> = tape.invoke("list_remote_runtimes", json!({})).await?;
         let entry = runtimes.iter().find(|r| r.name == runtime_name);
         last = entry
             .and_then(|r| r.state.as_ref())
@@ -128,7 +127,8 @@ pub async fn run(tape: &mut Tape, config: &Config) -> Result<bool> {
         .await?;
     }
 
-    tape.js::<Value>(r#"window.location.reload(); return "r";"#).await?;
+    tape.js::<Value>(r#"window.location.reload(); return "r";"#)
+        .await?;
     tape.sleep(Duration::from_secs(6)).await;
     tape.open_settings("remote-servers").await?;
     let panel_opens = tape
@@ -225,7 +225,8 @@ pub async fn run(tape: &mut Tape, config: &Config) -> Result<bool> {
     );
 
     tape.open_settings("remote-servers").await?;
-    tape.wait_for(&row_selector, Duration::from_secs(10)).await?;
+    tape.wait_for(&row_selector, Duration::from_secs(10))
+        .await?;
     tape.sleep(Duration::from_millis(800)).await;
 
     tape.scene(

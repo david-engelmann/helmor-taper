@@ -47,10 +47,7 @@ pub fn convert_mov_to_mp4(
         "mov-to-mp4",
         swift_bin,
         script_path,
-        &[
-            input_mov.as_os_str(),
-            output_mp4.as_os_str(),
-        ],
+        &[input_mov.as_os_str(), output_mp4.as_os_str()],
     )
 }
 
@@ -101,9 +98,7 @@ fn spawn_swift_tool(
         Err(PostError::NonZero {
             tool: tool.to_string(),
             status: output.status.to_string(),
-            stderr: String::from_utf8_lossy(&output.stderr)
-                .trim()
-                .to_string(),
+            stderr: String::from_utf8_lossy(&output.stderr).trim().to_string(),
         })
     }
 }
@@ -143,8 +138,7 @@ exit 0
         let mp4 = dir.path().join("master.mp4");
         std::fs::write(&mov, b"FAKE_MOV").unwrap();
 
-        convert_mov_to_mp4(&shim, Path::new("ignored-script-arg"), &mov, &mp4)
-            .expect("happy path");
+        convert_mov_to_mp4(&shim, Path::new("ignored-script-arg"), &mov, &mp4).expect("happy path");
 
         assert_eq!(std::fs::read(&mp4).unwrap(), b"FAKE_MOV");
     }
@@ -168,8 +162,7 @@ exit 0
         let gif = dir.path().join("master.gif");
         std::fs::write(&mp4, b"FAKE_MP4").unwrap();
 
-        convert_mp4_to_gif(&shim, Path::new("ignored"), &mp4, &gif, 5, 720)
-            .expect("happy path");
+        convert_mp4_to_gif(&shim, Path::new("ignored"), &mp4, &gif, 5, 720).expect("happy path");
 
         assert_eq!(std::fs::read(&gif).unwrap(), b"FAKE_GIF\n");
     }
@@ -189,8 +182,8 @@ exit 1
         let mp4 = dir.path().join("a.mp4");
         std::fs::write(&mov, b"FAKE").unwrap();
 
-        let err = convert_mov_to_mp4(&shim, Path::new("ignored"), &mov, &mp4)
-            .expect_err("non-zero exit");
+        let err =
+            convert_mov_to_mp4(&shim, Path::new("ignored"), &mov, &mp4).expect_err("non-zero exit");
         match err {
             PostError::NonZero { tool, stderr, .. } => {
                 assert_eq!(tool, "mov-to-mp4");

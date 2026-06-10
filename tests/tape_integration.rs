@@ -43,7 +43,9 @@ async fn spawn_mock_bridge() -> u16 {
                     let response = match command {
                         "execute_js" => {
                             let script = req["args"]["script"].as_str().unwrap_or_default();
-                            if script.contains("document.querySelector(") && script.contains(".click(); return true;") {
+                            if script.contains("document.querySelector(")
+                                && script.contains(".click(); return true;")
+                            {
                                 // `click` helper: report a successful hit.
                                 ok_frame(&id, json!(true))
                             } else if script.contains("return !!document.querySelector(") {
@@ -69,9 +71,7 @@ async fn spawn_mock_bridge() -> u16 {
     port
 }
 
-async fn make_tape(
-    out_dir: PathBuf,
-) -> helmor_taper::Tape {
+async fn make_tape(out_dir: PathBuf) -> helmor_taper::Tape {
     let port = spawn_mock_bridge().await;
     let url = format!("ws://127.0.0.1:{port}");
     // Build a Bridge via the public connect_direct entry, then attach
@@ -116,8 +116,12 @@ async fn tape_continuous_mode_emits_beats_and_extras() {
     tape.start_recording(10, 5, 720).await.unwrap();
 
     // Two beats — both should be persisted with their elapsed t.
-    tape.scene(SceneSpec::new("first beat").hold_sec(0)).await.unwrap();
-    tape.scene(SceneSpec::new("second beat").hold_sec(0)).await.unwrap();
+    tape.scene(SceneSpec::new("first beat").hold_sec(0))
+        .await
+        .unwrap();
+    tape.scene(SceneSpec::new("second beat").hold_sec(0))
+        .await
+        .unwrap();
 
     let passed = tape
         .finish(json!({"containerHostname": "081e3cab7eb5"}))
@@ -130,7 +134,10 @@ async fn tape_continuous_mode_emits_beats_and_extras() {
     assert_eq!(parsed.beats.len(), 2);
     assert_eq!(parsed.beats[0].caption, "first beat");
     assert_eq!(parsed.beats[1].caption, "second beat");
-    assert!(parsed.beats[0].t < parsed.beats[1].t, "beat timestamps monotonic");
+    assert!(
+        parsed.beats[0].t < parsed.beats[1].t,
+        "beat timestamps monotonic"
+    );
     // Extras flattened.
     let raw: Value = serde_json::from_str(&body).unwrap();
     assert_eq!(raw["containerHostname"], "081e3cab7eb5");
@@ -155,7 +162,10 @@ async fn tape_wait_for_returns_true_when_selector_present() {
     let tape = make_tape(dir.path().to_path_buf()).await;
 
     let appeared = tape
-        .wait_for("[data-testid=\"workspace-runtime-chip\"]", Duration::from_secs(1))
+        .wait_for(
+            "[data-testid=\"workspace-runtime-chip\"]",
+            Duration::from_secs(1),
+        )
         .await
         .unwrap();
     assert!(appeared);
@@ -185,10 +195,9 @@ async fn tape_scene_without_start_recording_is_a_no_op() {
     tape.assert("scene_did_not_error", true, "");
     tape.finish(json!({})).await.unwrap();
 
-    let summary: ResultSummary = serde_json::from_str(
-        &std::fs::read_to_string(dir.path().join("result.json")).unwrap(),
-    )
-    .unwrap();
+    let summary: ResultSummary =
+        serde_json::from_str(&std::fs::read_to_string(dir.path().join("result.json")).unwrap())
+            .unwrap();
     assert!(
         summary.beats.is_empty(),
         "no-recording scene must NOT push a beat: {:?}",
@@ -335,8 +344,12 @@ exit 0
         .build_disconnected(bridge);
 
     tape.start_recording(2, 5, 720).await.unwrap();
-    tape.scene(SceneSpec::new("first beat").hold_sec(0)).await.unwrap();
-    tape.scene(SceneSpec::new("second beat").hold_sec(0)).await.unwrap();
+    tape.scene(SceneSpec::new("first beat").hold_sec(0))
+        .await
+        .unwrap();
+    tape.scene(SceneSpec::new("second beat").hold_sec(0))
+        .await
+        .unwrap();
     let passed = tape.finish(json!({"shim_pipeline": true})).await.unwrap();
     assert!(passed);
 
@@ -346,10 +359,17 @@ exit 0
     // Post-processing produced both downstream artifacts.
     let mp4 = tape_dir.join("master.mp4");
     let gif = tape_dir.join("master.gif");
-    assert_eq!(std::fs::read(&mp4).unwrap(), b"FAKE_MOV", "mov2mp4 copies bytes verbatim");
+    assert_eq!(
+        std::fs::read(&mp4).unwrap(),
+        b"FAKE_MOV",
+        "mov2mp4 copies bytes verbatim"
+    );
     let gif_bytes = std::fs::read(&gif).unwrap();
     let gif_str = String::from_utf8(gif_bytes).unwrap();
-    assert!(gif_str.contains("FAKE_GIF_5_720"), "gif shim received fps/maxWidth: {gif_str}");
+    assert!(
+        gif_str.contains("FAKE_GIF_5_720"),
+        "gif shim received fps/maxWidth: {gif_str}"
+    );
 
     // result.json carries the beats + the flattened scenario extra.
     let summary: ResultSummary =
@@ -389,9 +409,7 @@ exit 1
         .await
         .unwrap();
 
-    let recorder = Box::new(
-        ScreenCaptureKitRecorder::new("ignored").with_swift_bin(record_shim),
-    );
+    let recorder = Box::new(ScreenCaptureKitRecorder::new("ignored").with_swift_bin(record_shim));
     let post = PostProcessing {
         swift_bin: failing,
         mov_to_mp4_script: PathBuf::from("ignored-script-arg"),
@@ -403,7 +421,10 @@ exit 1
         .build_disconnected(bridge);
 
     tape.start_recording(2, 5, 720).await.unwrap();
-    let err = tape.finish(json!({})).await.expect_err("post-processing must propagate");
+    let err = tape
+        .finish(json!({}))
+        .await
+        .expect_err("post-processing must propagate");
     assert!(
         err.to_string().contains("mov-to-mp4")
             && err.to_string().contains("passthrough preset not available"),

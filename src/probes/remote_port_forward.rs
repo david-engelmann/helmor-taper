@@ -59,10 +59,22 @@ pub async fn run(bridge: &Bridge, config: &Config) -> Result<bool> {
     let bg_cmd = format!("setsid {inline_server} > /tmp/pyhttp.log 2>&1 &");
     run_cmd(
         "docker",
-        &["exec", "-u", "e2e", "-d", &config.container, "sh", "-c", &bg_cmd],
+        &[
+            "exec",
+            "-u",
+            "e2e",
+            "-d",
+            &config.container,
+            "sh",
+            "-c",
+            &bg_cmd,
+        ],
     )?;
     sleep(Duration::from_millis(800)).await;
-    eprintln!("✓ test server listening on container :{}", config.remote_port);
+    eprintln!(
+        "✓ test server listening on container :{}",
+        config.remote_port
+    );
 
     // Sanity probe inside the container.
     let inner_check = format!(
@@ -159,7 +171,10 @@ pub async fn run(bridge: &Bridge, config: &Config) -> Result<bool> {
         "pkill -f 'http.server.HTTPServer.*{}' 2>/dev/null || pkill -f 'HTTPServer' 2>/dev/null || true",
         config.remote_port,
     );
-    let _ = run_cmd("docker", &["exec", &config.container, "sh", "-c", &kill_cmd]);
+    let _ = run_cmd(
+        "docker",
+        &["exec", &config.container, "sh", "-c", &kill_cmd],
+    );
 
     Ok(outer_hit && listed)
 }
@@ -189,5 +204,4 @@ mod tests {
         assert_eq!(parsed[0].runtime_name, "docker-linux-arm64");
         assert_eq!(parsed[0].local_port, 9999);
     }
-
 }

@@ -58,12 +58,7 @@ pub async fn execute_js(bridge: &Bridge, script: &str) -> Result<Value> {
 /// Doesn't await the command itself — the surrounding script stays sync
 /// so the bridge's async-detection doesn't downgrade it. Pair with
 /// [`poll_result`] or use [`invoke_and_wait`] as a convenience.
-pub async fn invoke_command(
-    bridge: &Bridge,
-    cmd: &str,
-    args: Value,
-    slot: &str,
-) -> Result<()> {
+pub async fn invoke_command(bridge: &Bridge, cmd: &str, args: Value, slot: &str) -> Result<()> {
     let script = format!(
         r#"
         window.__taper = window.__taper || {{}};
@@ -160,9 +155,8 @@ pub async fn capture_screenshot(bridge: &Bridge, out_path: &Path) -> Result<()> 
     let bytes = decode_base64(b64)?;
 
     if let Some(parent) = out_path.parent() {
-        std::fs::create_dir_all(parent).with_context(|| {
-            format!("failed to create screenshot dir {}", parent.display())
-        })?;
+        std::fs::create_dir_all(parent)
+            .with_context(|| format!("failed to create screenshot dir {}", parent.display()))?;
     }
     std::fs::write(out_path, &bytes)
         .with_context(|| format!("failed to write screenshot {}", out_path.display()))?;

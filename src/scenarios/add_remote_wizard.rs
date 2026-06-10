@@ -26,14 +26,14 @@ pub struct Config {
 impl Config {
     pub fn from_env() -> Self {
         Self {
-            host_alias: std::env::var("HOST_ALIAS")
-                .unwrap_or_else(|_| "helmor-taper-arm64".into()),
+            host_alias: std::env::var("HOST_ALIAS").unwrap_or_else(|_| "helmor-taper-arm64".into()),
         }
     }
 }
 
 pub async fn run(tape: &mut Tape, config: &Config) -> Result<bool> {
-    tape.js::<Value>(r#"window.location.reload(); return "r";"#).await?;
+    tape.js::<Value>(r#"window.location.reload(); return "r";"#)
+        .await?;
     tape.sleep(Duration::from_secs(6)).await;
 
     tape.open_settings("remote-servers").await?;
@@ -86,7 +86,10 @@ pub async fn run(tape: &mut Tape, config: &Config) -> Result<bool> {
                return d?d.innerText.replace(/\n+/g," · ").slice(0,180):null;"#,
         )
         .await?;
-    tape.log(&format!("host detail: {}", detail.clone().unwrap_or_default()));
+    tape.log(&format!(
+        "host detail: {}",
+        detail.clone().unwrap_or_default()
+    ));
     tape.scene(
         SceneSpec::new(format!(
             "Typing \"{}\" matches an ~/.ssh/config entry — Helmor previews hostname/port/identity straight from your config",
